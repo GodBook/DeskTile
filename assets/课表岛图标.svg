@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>DeskTile 课表岛应用图标</title>
+  <rect x="40" y="40" width="944" height="944" rx="220" fill="#17202D"/>
+  <rect x="214" y="214" width="596" height="620" rx="112" fill="#F7F8FA"/>
+  <path d="M214 326V326C214 264.144 264.144 214 326 214H698C759.856 214 810 264.144 810 326V354H214V326Z" fill="#E8EEF5"/>
+  <rect x="326" y="154" width="72" height="154" rx="36" fill="#4CAF93"/>
+  <rect x="626" y="154" width="72" height="154" rx="36" fill="#4CAF93"/>
+  <rect x="286" y="408" width="42" height="18" rx="9" fill="#9AA8B8"/>
+  <rect x="286" y="494" width="42" height="18" rx="9" fill="#9AA8B8"/>
+  <rect x="286" y="580" width="42" height="18" rx="9" fill="#9AA8B8"/>
+  <rect x="286" y="666" width="42" height="18" rx="9" fill="#9AA8B8"/>
+  <rect x="366" y="394" width="146" height="292" rx="42" fill="#3B6EA8"/>
+  <rect x="548" y="394" width="178" height="126" rx="38" fill="#4CAF93"/>
+  <rect x="548" y="560" width="178" height="126" rx="38" fill="#E8834A"/>
+  <rect x="366" y="724" width="360" height="22" rx="11" fill="#D5DEE8"/>
+</svg>

@@ -1,4 +1,6 @@
 // 直接触发测试提醒，绕开 UI，用来验证通知链路
+// ignore_for_file: avoid_print
+
 import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:timezone/data/latest.dart' as tz;

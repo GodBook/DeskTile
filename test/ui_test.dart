@@ -10,6 +10,8 @@ import 'package:desktile/core/week_math.dart';
 import 'package:desktile/data/app_state.dart';
 import 'package:desktile/data/store.dart';
 import 'package:desktile/data/widget_position.dart';
+import 'package:desktile/platform/notifications.dart';
+import 'package:desktile/ui/app.dart';
 import 'package:desktile/ui/pages/exams_page.dart';
 import 'package:desktile/ui/pages/import_export_page.dart';
 import 'package:desktile/ui/pages/timetable_page.dart';
@@ -73,6 +75,76 @@ Widget _host(AppState state, Widget child) => AppScope(
     );
 
 void main() {
+  test('Android 通知小图标资源配置完整', () {
+    const iconName = ReminderService.androidNotificationIconResource;
+    expect(iconName, 'ic_notification');
+    expect(iconName, isNot(contains('@')));
+    expect(iconName, isNot(contains('/')));
+
+    expect(
+      File('android/app/src/main/res/drawable/$iconName.xml').existsSync(),
+      isTrue,
+    );
+    final keepRules = File('android/app/src/main/res/raw/keep.xml')
+        .readAsStringSync();
+    expect(keepRules, contains('@drawable/$iconName'));
+  });
+
+  testWidgets('主窗口：手机布局避开状态栏并使用底部导航', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.padding = const FakeViewPadding(top: 24);
+    addTearDown(tester.view.reset);
+
+    final state = await _makeState(tester);
+    await tester.pumpWidget(
+      MainApp(state: state, reminders: ReminderService()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
+    expect(tester.getTopLeft(find.text('测试课表')).dy, greaterThan(24));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('主窗口：宽屏继续使用侧边导航', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 600);
+    addTearDown(tester.view.reset);
+
+    final state = await _makeState(tester);
+    await tester.pumpWidget(
+      MainApp(state: state, reminders: ReminderService()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('课程编辑器：窄屏字段能够重排且没有布局溢出', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.padding = const FakeViewPadding(top: 24);
+    addTearDown(tester.view.reset);
+
+    final state = await _makeState(tester);
+    await tester.pumpWidget(
+      MainApp(state: state, reminders: ReminderService()),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('添加课程'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('课程名称 *'), findsOneWidget);
+    expect(find.text('教师'), findsOneWidget);
+    expect(find.text('教室'), findsOneWidget);
+    expect(find.byType(DropdownButtonFormField<int>), findsNWidgets(3));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('周视图：默认落在本周，画出课程块、星期和节次时间', (tester) async {
     final state = await _makeState(tester);
     await tester.pumpWidget(_host(state, const TimetablePage()));

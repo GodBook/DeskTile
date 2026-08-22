@@ -44,6 +44,8 @@ class _Shell extends StatefulWidget {
 }
 
 class _ShellState extends State<_Shell> {
+  static const _compactBreakpoint = 640.0;
+
   int _index = 0;
 
   @override
@@ -55,44 +57,83 @@ class _ShellState extends State<_Shell> {
       SettingsPage(reminders: widget.reminders),
     ];
 
-    return Scaffold(
-      body: Row(
-        children: [
-          NavigationRail(
-            selectedIndex: _index,
-            onDestinationSelected: (i) => setState(() => _index = i),
-            labelType: NavigationRailLabelType.all,
-            leading: const Padding(
-              padding: EdgeInsets.only(top: 12, bottom: 4),
-              child: Icon(Icons.grid_view_rounded, size: 26),
-            ),
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.calendar_view_week_outlined),
-                selectedIcon: Icon(Icons.calendar_view_week),
-                label: Text('课表'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.event_note_outlined),
-                selectedIcon: Icon(Icons.event_note),
-                label: Text('考试'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.import_export_outlined),
-                selectedIcon: Icon(Icons.import_export),
-                label: Text('导入导出'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: Text('设置'),
-              ),
-            ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < _compactBreakpoint;
+        return Scaffold(
+          body: SafeArea(
+            bottom: false,
+            child: compact
+                ? pages[_index]
+                : Row(
+                    children: [
+                      NavigationRail(
+                        selectedIndex: _index,
+                        onDestinationSelected: (i) =>
+                            setState(() => _index = i),
+                        labelType: NavigationRailLabelType.all,
+                        leading: const Padding(
+                          padding: EdgeInsets.only(top: 12, bottom: 4),
+                          child: Icon(Icons.grid_view_rounded, size: 26),
+                        ),
+                        destinations: const [
+                          NavigationRailDestination(
+                            icon: Icon(Icons.calendar_view_week_outlined),
+                            selectedIcon: Icon(Icons.calendar_view_week),
+                            label: Text('课表'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.event_note_outlined),
+                            selectedIcon: Icon(Icons.event_note),
+                            label: Text('考试'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.import_export_outlined),
+                            selectedIcon: Icon(Icons.import_export),
+                            label: Text('导入导出'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.settings_outlined),
+                            selectedIcon: Icon(Icons.settings),
+                            label: Text('设置'),
+                          ),
+                        ],
+                      ),
+                      const VerticalDivider(width: 1),
+                      Expanded(child: pages[_index]),
+                    ],
+                  ),
           ),
-          const VerticalDivider(width: 1),
-          Expanded(child: pages[_index]),
-        ],
-      ),
+          bottomNavigationBar: compact
+              ? NavigationBar(
+                  selectedIndex: _index,
+                  onDestinationSelected: (i) => setState(() => _index = i),
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.calendar_view_week_outlined),
+                      selectedIcon: Icon(Icons.calendar_view_week),
+                      label: '课表',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.event_note_outlined),
+                      selectedIcon: Icon(Icons.event_note),
+                      label: '考试',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.import_export_outlined),
+                      selectedIcon: Icon(Icons.import_export),
+                      label: '导入导出',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.settings_outlined),
+                      selectedIcon: Icon(Icons.settings),
+                      label: '设置',
+                    ),
+                  ],
+                )
+              : null,
+        );
+      },
     );
   }
 }

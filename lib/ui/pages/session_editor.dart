@@ -196,7 +196,7 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
     return AlertDialog(
       title: Text(isEditing ? '编辑课程' : '添加课程'),
       content: SizedBox(
-        width: 460,
+        width: MediaQuery.sizeOf(context).width < 600 ? double.maxFinite : 460,
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -208,70 +208,97 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
                 onSubmitted: (_) => _save(),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _teacher,
-                      decoration: const InputDecoration(labelText: '教师'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: _room,
-                      decoration: const InputDecoration(labelText: '教室'),
-                    ),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final teacher = TextField(
+                    controller: _teacher,
+                    decoration: const InputDecoration(labelText: '教师'),
+                  );
+                  final room = TextField(
+                    controller: _room,
+                    decoration: const InputDecoration(labelText: '教室'),
+                  );
+                  if (constraints.maxWidth < 380) {
+                    return Column(
+                      children: [teacher, const SizedBox(height: 12), room],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: teacher),
+                      const SizedBox(width: 12),
+                      Expanded(child: room),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<int>(
-                      initialValue: _day,
-                      decoration: const InputDecoration(labelText: '星期'),
-                      items: [
-                        for (var d = 1; d <= 7; d++)
-                          DropdownMenuItem(value: d, child: Text(weekDayName(d))),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final dayField = DropdownButtonFormField<int>(
+                    initialValue: _day,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: '星期'),
+                    items: [
+                      for (var d = 1; d <= 7; d++)
+                        DropdownMenuItem(value: d, child: Text(weekDayName(d))),
+                    ],
+                    onChanged: (v) => setState(() => _day = v ?? _day),
+                  );
+                  final startField = DropdownButtonFormField<int>(
+                    initialValue: _start.clamp(1, maxSection),
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: '开始节次'),
+                    items: [
+                      for (var s = 1; s <= maxSection; s++)
+                        DropdownMenuItem(value: s, child: Text('第 $s 节')),
+                    ],
+                    onChanged: (v) => setState(() {
+                      _start = v ?? _start;
+                      if (_end < _start) _end = _start;
+                    }),
+                  );
+                  final endField = DropdownButtonFormField<int>(
+                    initialValue: _end.clamp(_start, maxSection),
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: '结束节次'),
+                    items: [
+                      for (var s = _start; s <= maxSection; s++)
+                        DropdownMenuItem(value: s, child: Text('第 $s 节')),
+                    ],
+                    onChanged: (v) => setState(() => _end = v ?? _end),
+                  );
+
+                  if (constraints.maxWidth < 420) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        dayField,
+                        const SizedBox(height: 12),
+                        startField,
+                        const SizedBox(height: 12),
+                        endField,
                       ],
-                      onChanged: (v) => setState(() => _day = v ?? _day),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<int>(
-                      initialValue: _start.clamp(1, maxSection),
-                      decoration: const InputDecoration(labelText: '开始节次'),
-                      items: [
-                        for (var s = 1; s <= maxSection; s++)
-                          DropdownMenuItem(value: s, child: Text('第 $s 节')),
-                      ],
-                      onChanged: (v) => setState(() {
-                        _start = v ?? _start;
-                        if (_end < _start) _end = _start;
-                      }),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<int>(
-                      initialValue: _end.clamp(_start, maxSection),
-                      decoration: const InputDecoration(labelText: '结束节次'),
-                      items: [
-                        for (var s = _start; s <= maxSection; s++)
-                          DropdownMenuItem(value: s, child: Text('第 $s 节')),
-                      ],
-                      onChanged: (v) => setState(() => _end = v ?? _end),
-                    ),
-                  ),
-                ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: dayField),
+                      const SizedBox(width: 12),
+                      Expanded(child: startField),
+                      const SizedBox(width: 12),
+                      Expanded(child: endField),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 16),
               Align(
                 alignment: Alignment.centerLeft,
-                child: Text('上课周次', style: Theme.of(context).textTheme.labelLarge),
+                child: Text(
+                  '上课周次',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
               ),
               const SizedBox(height: 6),
               Wrap(
@@ -322,8 +349,10 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
         if (isEditing)
           TextButton(
             onPressed: _delete,
-            child: Text('删除',
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            child: Text(
+              '删除',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
@@ -334,4 +363,3 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
     );
   }
 }
-

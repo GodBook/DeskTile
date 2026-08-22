@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../core/models/settings.dart';
@@ -15,6 +17,7 @@ import 'windows_registry.dart';
 class ReminderService {
   static const appName = 'DeskTile 课表岛';
   static const aumid = 'DeskTile.KeBiaoDao.Desktop';
+  static const androidNotificationIconResource = 'ic_notification';
   static const _guid = '4d1b2f80-3c7a-4e21-9f6d-8c5a1e7b9042';
 
   /// 一次排多少天。配合每天 00:05 的重排，足够覆盖。
@@ -24,10 +27,31 @@ class ReminderService {
       FlutterLocalNotificationsPlugin();
 
   bool _ready = false;
+  bool _timezoneReady = false;
+  tz.Location _scheduleLocation = tz.UTC;
   String? _lastError;
 
   bool get ready => _ready;
   String? get lastError => _lastError;
+
+  /// 初始化 timezone 数据库。Windows 端沿用 UTC（插件按绝对时间戳调度），
+  /// Android 端则必须使用设备的 IANA 时区，否则夏令时或非 UTC 时区会错时。
+  Future<void> _initTimezone() async {
+    if (_timezoneReady) return;
+    tz_data.initializeTimeZones();
+    _scheduleLocation = tz.UTC;
+    if (Platform.isAndroid) {
+      try {
+        final info = await FlutterTimezone.getLocalTimezone();
+        _scheduleLocation = tz.getLocation(info.identifier);
+      } catch (e) {
+        // 设备返回未知时区时仍让通知可用；UTC 是明确且可诊断的兜底。
+        _lastError ??= '读取设备时区失败：$e';
+      }
+    }
+    tz.setLocalLocation(_scheduleLocation);
+    _timezoneReady = true;
+  }
 
   static String get iconPath {
     final dir = File(Platform.resolvedExecutable).parent.path;
@@ -39,9 +63,13 @@ class ReminderService {
   Future<bool> init() async {
     if (_ready) return true;
     try {
+      await _initTimezone();
       if (Platform.isWindows) await _registerToastSender();
       final ok = await _plugin.initialize(
         settings: InitializationSettings(
+          android: const AndroidInitializationSettings(
+            androidNotificationIconResource,
+          ),
           windows: WindowsInitializationSettings(
             appName: appName,
             appUserModelId: aumid,
@@ -57,6 +85,26 @@ class ReminderService {
       _lastError = '$e';
     }
     return _ready;
+  }
+
+  /// 由设置页的明确用户操作触发。精准闹钟授权可能打开系统设置页，因此
+  /// 不能在 `runApp` 前或 WorkManager 后台任务里静默调用。
+  Future<bool> requestAndroidPermissions() async {
+    if (!Platform.isAndroid) return true;
+    if (!_ready && !await init()) return false;
+    try {
+      final android = _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+      final notification =
+          await android?.requestNotificationsPermission() ?? false;
+      final exact = await android?.requestExactAlarmsPermission() ?? false;
+      return notification && exact;
+    } catch (e) {
+      _lastError = '$e';
+      return false;
+    }
   }
 
   /// 未打包的 Win32 程序要让 Toast 显示正确的应用名和图标，需要在
@@ -98,10 +146,7 @@ class ReminderService {
           id: r.id,
           title: r.title,
           body: r.body,
-          // Windows 端只用到绝对时刻（millisecondsSinceEpoch），
-          // 所以用 UTC 表示同一瞬间即可，不必去查系统的 IANA 时区名。
-          // Phase 2 接 Android 时要换成真正的本地时区。
-          scheduledDate: tz.TZDateTime.from(r.fireAt, tz.UTC),
+          scheduledDate: tz.TZDateTime.from(r.fireAt, _scheduleLocation),
           notificationDetails: _details,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         );
@@ -114,14 +159,20 @@ class ReminderService {
   }
 
   /// 设置页里的「测试提醒」：10 秒后弹一条，用来确认通知链路是通的。
-  Future<bool> scheduleTest({Duration delay = const Duration(seconds: 10)}) async {
+  Future<bool> scheduleTest({
+    Duration delay = const Duration(seconds: 10),
+  }) async {
     if (!_ready && !await init()) return false;
+    if (Platform.isAndroid && !await requestAndroidPermissions()) return false;
     try {
       await _plugin.zonedSchedule(
         id: 999000,
         title: '早八提醒：测试课程',
         body: '08:00 上课 · 第1-2节 · 教三-305',
-        scheduledDate: tz.TZDateTime.from(DateTime.now().add(delay), tz.UTC),
+        scheduledDate: tz.TZDateTime.from(
+          DateTime.now().add(delay),
+          _scheduleLocation,
+        ),
         notificationDetails: _details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       );

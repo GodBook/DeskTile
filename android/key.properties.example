@@ -1,0 +1,6 @@
+# Copy this file to key.properties and replace every placeholder.
+# Never commit key.properties or the keystore itself.
+storeFile=keystore/desktile-release.jks
+storePassword=CHANGE_ME
+keyAlias=desktile
+keyPassword=CHANGE_ME

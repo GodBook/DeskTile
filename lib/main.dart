@@ -7,6 +7,8 @@ import 'package:window_manager/window_manager.dart';
 import 'data/app_state.dart';
 import 'data/store.dart';
 import 'data/widget_position.dart';
+import 'platform/android_background.dart';
+import 'platform/android_widget.dart';
 import 'platform/desktop_window.dart';
 import 'platform/notifications.dart';
 import 'platform/single_instance.dart';
@@ -23,11 +25,80 @@ import 'ui/widget_app.dart';
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   final store = DataStore();
+  if (Platform.isAndroid) {
+    await _runAndroidMain(store);
+    return;
+  }
   if (isWidgetMode(args)) {
     await _runWidget(store);
   } else {
     await _runMainWindow(store);
   }
+}
+
+/// Android 只有一个 Flutter 主界面；桌面端的单实例、托盘和无边框挂件
+/// 都不应在这里初始化。课表变化时同步一份纯文本快照给 Glance 小组件。
+Future<void> _runAndroidMain(DataStore store) async {
+  final state = AppState(store: store);
+  await state.load();
+
+  final reminders = ReminderService();
+  runApp(MainApp(state: state, reminders: reminders));
+
+  var syncing = false;
+  var syncAgain = false;
+  var reminderSyncPending = false;
+  var debouncedReminderSync = false;
+  Timer? debounce;
+  var lastTimetable = state.activeTimetable;
+
+  Future<void> sync({bool remindersToo = false}) async {
+    reminderSyncPending = reminderSyncPending || remindersToo;
+    if (syncing) {
+      syncAgain = true;
+      return;
+    }
+    syncing = true;
+    do {
+      syncAgain = false;
+      final shouldSyncReminders = reminderSyncPending;
+      reminderSyncPending = false;
+      await AndroidWidgetService.update(
+        timetable: state.activeTimetable,
+        exams: state.exams,
+      );
+      if (shouldSyncReminders) {
+        await reminders.reschedule(
+          timetable: state.activeTimetable,
+          settings: state.settings,
+        );
+      }
+    } while (syncAgain || reminderSyncPending);
+    syncing = false;
+  }
+
+  void scheduleSync() {
+    final timetableChanged = !identical(lastTimetable, state.activeTimetable);
+    lastTimetable = state.activeTimetable;
+    debouncedReminderSync = debouncedReminderSync || timetableChanged;
+    debounce?.cancel();
+    debounce = Timer(
+      const Duration(milliseconds: 300),
+      () {
+        final shouldSyncReminders = debouncedReminderSync;
+        debouncedReminderSync = false;
+        unawaited(sync(remindersToo: shouldSyncReminders));
+      },
+    );
+  }
+
+  state.addListener(scheduleSync);
+  await reminders.init();
+  await sync(remindersToo: true);
+  await initializeAndroidBackgroundWork();
+
+  // 前台打开时让倒计时保持新鲜；后台由 WorkManager 接手。
+  Timer.periodic(const Duration(minutes: 1), (_) => unawaited(sync()));
 }
 
 Future<void> _runMainWindow(DataStore store) async {

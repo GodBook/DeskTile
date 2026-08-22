@@ -43,13 +43,17 @@ class _TimetablePageState extends State<TimetablePage> {
           onToday: () => setState(() => _week = null),
         ),
         const Divider(height: 1),
-        Expanded(child: _Grid(timetable: t, week: week)),
+        Expanded(
+          child: _Grid(timetable: t, week: week),
+        ),
       ],
     );
   }
 }
 
 class _Toolbar extends StatelessWidget {
+  static const _compactBreakpoint = 620.0;
+
   const _Toolbar({
     required this.timetable,
     required this.week,
@@ -65,54 +69,122 @@ class _Toolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final realWeek =
-        currentWeek(timetable.termStart, DateTime.now(), timetable.totalWeeks);
+    final realWeek = currentWeek(
+      timetable.termStart,
+      DateTime.now(),
+      timetable.totalWeeks,
+    );
     final monday = dateOfWeekDay(timetable.termStart, week, 1);
     final sunday = dateOfWeekDay(timetable.termStart, week, 7);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      child: Row(
-        children: [
-          Text(timetable.name, style: theme.textTheme.titleMedium),
-          const SizedBox(width: 16),
-          IconButton(
-            tooltip: '上一周',
-            icon: const Icon(Icons.chevron_left),
-            onPressed: week > 1 ? () => onWeek(week - 1) : null,
+    final weekLabel = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '第 $week 周 · ${week.isOdd ? '单周' : '双周'}',
+          style: theme.textTheme.titleSmall,
+        ),
+        Text(
+          '${monthDayText(monday)} - ${monthDayText(sunday)}',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.outline,
           ),
-          Container(
-            constraints: const BoxConstraints(minWidth: 96),
-            alignment: Alignment.center,
+        ),
+      ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < _compactBreakpoint) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             child: Column(
               children: [
-                Text('第 $week 周 · ${week.isOdd ? '单周' : '双周'}',
-                    style: theme.textTheme.titleSmall),
-                Text('${monthDayText(monday)} - ${monthDayText(sunday)}',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.outline)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        timetable.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: () => showSessionEditor(context, week: week),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('添加课程'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: '上一周',
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: week > 1 ? () => onWeek(week - 1) : null,
+                    ),
+                    Expanded(child: Center(child: weekLabel)),
+                    IconButton(
+                      tooltip: '下一周',
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: week < timetable.totalWeeks
+                          ? () => onWeek(week + 1)
+                          : null,
+                    ),
+                    IconButton(
+                      tooltip: realWeek == null ? '不在学期内' : '回到本周',
+                      onPressed: onToday,
+                      icon: const Icon(Icons.today, size: 20),
+                    ),
+                  ],
+                ),
               ],
             ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+          child: Row(
+            children: [
+              Text(timetable.name, style: theme.textTheme.titleMedium),
+              const SizedBox(width: 16),
+              IconButton(
+                tooltip: '上一周',
+                icon: const Icon(Icons.chevron_left),
+                onPressed: week > 1 ? () => onWeek(week - 1) : null,
+              ),
+              Container(
+                constraints: const BoxConstraints(minWidth: 96),
+                alignment: Alignment.center,
+                child: weekLabel,
+              ),
+              IconButton(
+                tooltip: '下一周',
+                icon: const Icon(Icons.chevron_right),
+                onPressed: week < timetable.totalWeeks
+                    ? () => onWeek(week + 1)
+                    : null,
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: onToday,
+                icon: const Icon(Icons.today, size: 18),
+                label: Text(realWeek == null ? '不在学期内' : '回到本周'),
+              ),
+              const Spacer(),
+              FilledButton.icon(
+                onPressed: () => showSessionEditor(context, week: week),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('添加课程'),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: '下一周',
-            icon: const Icon(Icons.chevron_right),
-            onPressed: week < timetable.totalWeeks ? () => onWeek(week + 1) : null,
-          ),
-          const SizedBox(width: 8),
-          TextButton.icon(
-            onPressed: onToday,
-            icon: const Icon(Icons.today, size: 18),
-            label: Text(realWeek == null ? '不在学期内' : '回到本周'),
-          ),
-          const Spacer(),
-          FilledButton.icon(
-            onPressed: () => showSessionEditor(context, week: week),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('添加课程'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -135,39 +207,50 @@ class _Grid extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 列宽按可用宽度均分，永远刚好铺满，不需要横向滚动。
-        // 主窗口有 860 的最小宽度，7 列时每列也还有 ~95 逻辑像素。
-        final colWidth = (constraints.maxWidth - _timeColumnWidth) / dayCount;
-        return Column(
-          children: [
-            // 星期表头固定在上面，纵向滚动时不会跟着滚掉。
-            _HeaderRow(
-              timetable: t,
-              week: week,
-              dayCount: dayCount,
-              colWidth: colWidth,
-              todayDay: today?.week == week ? today?.day : null,
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _TimeColumn(timetable: t, maxSection: maxSection),
-                    for (var day = 1; day <= dayCount; day++)
-                      _DayColumn(
-                        timetable: t,
-                        week: week,
-                        day: day,
-                        width: colWidth,
-                        maxSection: maxSection,
-                        isToday: today?.week == week && today?.day == day,
-                      ),
-                  ],
+        final availableColWidth =
+            (constraints.maxWidth - _timeColumnWidth) / dayCount;
+        final colWidth = availableColWidth < 96 ? 96.0 : availableColWidth;
+        final gridWidth = _timeColumnWidth + colWidth * dayCount;
+
+        // 表头和内容放在同一个水平视口中，两者始终使用同一滚动偏移。
+        return SingleChildScrollView(
+          key: const ValueKey('timetable-horizontal-scroll'),
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: gridWidth,
+            height: constraints.maxHeight,
+            child: Column(
+              children: [
+                // 星期表头固定在上面，纵向滚动时不会跟着滚掉。
+                _HeaderRow(
+                  timetable: t,
+                  week: week,
+                  dayCount: dayCount,
+                  colWidth: colWidth,
+                  todayDay: today?.week == week ? today?.day : null,
                 ),
-              ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _TimeColumn(timetable: t, maxSection: maxSection),
+                        for (var day = 1; day <= dayCount; day++)
+                          _DayColumn(
+                            timetable: t,
+                            week: week,
+                            day: day,
+                            width: colWidth,
+                            maxSection: maxSection,
+                            isToday: today?.week == week && today?.day == day,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
@@ -204,7 +287,9 @@ class _HeaderRow extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: day == todayDay
-                      ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
+                      ? theme.colorScheme.primaryContainer.withValues(
+                          alpha: 0.5,
+                        )
                       : null,
                   border: Border(
                     left: BorderSide(color: theme.dividerColor, width: 0.5),
@@ -215,15 +300,21 @@ class _HeaderRow extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(weekDayName(day),
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight:
-                                day == todayDay ? FontWeight.bold : FontWeight.w500,
-                          )),
                       Text(
-                        monthDayText(dateOfWeekDay(timetable.termStart, week, day)),
-                        style: theme.textTheme.labelSmall
-                            ?.copyWith(color: theme.colorScheme.outline),
+                        weekDayName(day),
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: day == todayDay
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        monthDayText(
+                          dateOfWeekDay(timetable.termStart, week, day),
+                        ),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
                       ),
                     ],
                   ),
@@ -265,12 +356,18 @@ class _TimeColumn extends StatelessWidget {
                   children: [
                     Text('$s', style: theme.textTheme.labelMedium),
                     if (timetable.slotAt(s) != null) ...[
-                      Text(timetable.slotAt(s)!.startText,
-                          style: theme.textTheme.labelSmall
-                              ?.copyWith(color: theme.colorScheme.outline)),
-                      Text(timetable.slotAt(s)!.endText,
-                          style: theme.textTheme.labelSmall
-                              ?.copyWith(color: theme.colorScheme.outline)),
+                      Text(
+                        timetable.slotAt(s)!.startText,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
+                      ),
+                      Text(
+                        timetable.slotAt(s)!.endText,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -317,7 +414,9 @@ class _DayColumn extends StatelessWidget {
                   height: _rowHeight,
                   decoration: BoxDecoration(
                     color: isToday
-                        ? theme.colorScheme.primaryContainer.withValues(alpha: 0.14)
+                        ? theme.colorScheme.primaryContainer.withValues(
+                            alpha: 0.14,
+                          )
                         : null,
                     border: Border(
                       top: BorderSide(color: theme.dividerColor, width: 0.5),
@@ -362,15 +461,14 @@ class _CourseBlock extends StatelessWidget {
     final room = session.session.room;
 
     return Material(
-      color: color.withValues(alpha: theme.brightness == Brightness.dark ? 0.34 : 0.16),
+      color: color.withValues(
+        alpha: theme.brightness == Brightness.dark ? 0.34 : 0.16,
+      ),
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: () => showSessionEditor(
-          context,
-          week: week,
-          session: session.session,
-        ),
+        onTap: () =>
+            showSessionEditor(context, week: week, session: session.session),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
           decoration: BoxDecoration(
@@ -381,9 +479,11 @@ class _CourseBlock extends StatelessWidget {
           // 按可用高度决定显示到哪一层，而不是硬塞导致溢出。
           child: LayoutBuilder(
             builder: (context, box) {
-              final showRoom = box.maxHeight >= 46 && room != null && room.isNotEmpty;
+              final showRoom =
+                  box.maxHeight >= 46 && room != null && room.isNotEmpty;
               final showTeacher =
-                  box.maxHeight >= 86 && (session.course.teacher?.isNotEmpty ?? false);
+                  box.maxHeight >= 86 &&
+                  (session.course.teacher?.isNotEmpty ?? false);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -403,16 +503,18 @@ class _CourseBlock extends StatelessWidget {
                       room,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   if (showTeacher)
                     Text(
                       session.course.teacher!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: theme.colorScheme.outline),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
                     ),
                 ],
               );
@@ -423,7 +525,3 @@ class _CourseBlock extends StatelessWidget {
     );
   }
 }
-
-
-
-

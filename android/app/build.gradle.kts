@@ -1,8 +1,27 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.isFile) {
+    FileInputStream(keystorePropertiesFile).use(keystoreProperties::load)
+}
+
+val releaseStoreFile =
+    keystoreProperties.getProperty("storeFile")?.let { rootProject.file(it) }
+val releaseSigningReady =
+    releaseStoreFile?.isFile == true &&
+        listOf("storePassword", "keyAlias", "keyPassword").all {
+            !keystoreProperties.getProperty(it).isNullOrBlank()
+        }
 
 android {
     namespace = "com.desktile.desktile"
@@ -10,12 +29,13 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // This identifier is the app's permanent Play Store identity.
         applicationId = "com.desktile.desktile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -29,11 +49,26 @@ android {
         versionName = flutter.versionName
     }
 
+    // Glance widgets use Compose at compile time. Kotlin 2.4's Compose
+    // compiler is supplied by the Kotlin Compose plugin above.
+    buildFeatures {
+        compose = true
+    }
+
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("release") {
+                storeFile = releaseStoreFile
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 }
@@ -46,4 +81,29 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // home_widget 0.9.3 brings this transitively, but declaring it here keeps
+    // the app's Glance source independent of a plugin implementation detail.
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+}
+
+tasks.configureEach {
+    val packagesRelease =
+        name.contains("Release", ignoreCase = true) &&
+            (name.startsWith("assemble", ignoreCase = true) ||
+                name.startsWith("bundle", ignoreCase = true) ||
+                name.startsWith("package", ignoreCase = true))
+    if (packagesRelease) {
+        doFirst {
+            if (!releaseSigningReady) {
+                throw GradleException(
+                    "Release signing is not configured. Copy android/key.properties.example " +
+                        "to android/key.properties and provide the release keystore.",
+                )
+            }
+        }
+    }
 }

@@ -1,23 +1,24 @@
 # DeskTile 课表岛 — 项目交接文档
 
-> 最后更新：2026-08-22 · 对应提交：Phase 1（Windows 端）完成 + Android 环境就绪
+> 最后更新：2026-08-22 · 当前状态：Phase 1（Windows）完成 + Phase 2（Android）完成
 > 代码位置：`D:\CLAUDE\DeskTile`（原中文目录 `D:\CLAUDE\DeskTile课表岛` 未使用，见 §1.2）
 > 仓库：https://github.com/GodBook/DeskTile （私有）· 发布：`v1.0.0`（带 Windows x64 免安装包）
-> 规模：`lib/` 37 个文件 5399 行，`test/` 10 个文件 1303 行 / 117 个用例
+> 规模：`lib/` 41 个文件 6258 行，`test/` 13 个文件 1563 行 / 131 个用例
 
 ---
 
 ## 0. 现状一句话
 
-**Windows 端**功能完整、构建通过、117 个测试全绿、实机跑过并截图，已打包发布到 GitHub Release；
+**Windows 端**功能完整、Release 构建通过、131 个跨平台测试全绿、实机跑过并截图，已打包发布到 GitHub Release；
 唯一已知缺陷是 Toast 弹窗在本机 Windows 11 26200 上不显示（排定逻辑正确，见 §8）。
 
-**Android 端**：工具链和 SDK 已经装好（JDK 24 + Android SDK 36 + 模拟器镜像，见 §1.1 / §10 ①），
-但**代码一行都没改**。跨平台核心逻辑（周次计算、单双周、提醒计划、四种导入解析）
-早就在 `lib/core/` 里做完并被测试覆盖，Android 剩下的是接原生小组件、精准闹钟、
-以及把提醒的时区处理从 UTC 换成真本地时区。
+**Android 端 Phase 2 已完成**：单 Activity 手机界面、Jetpack Glance 主屏小组件、
+30 分钟后台刷新、IANA 本地时区精准提醒、每日重排和开机恢复均已落地。
+API 36 模拟器已验证小组件即时刷新、10 秒通知、精准闹钟、重启恢复和原生应用详情入口；
+Debug APK 位于 `build\app\outputs\flutter-apk\app-debug.apk`。
 
-**下次接手的第一件事**：§10 ①「还差什么」那三条命令。
+**下次接手的第一件事**：若准备发布 Android，先做 §10.5 的真机后台可靠性验证、
+备份签名密钥并确定 Play App Signing；若继续产品功能，则进入 §11 的教务系统直连。
 
 ---
 
@@ -25,7 +26,7 @@
 
 | 项 | 状态 |
 |---|---|
-| git 仓库 | 已建（`master` 分支，2 个提交 + 1 个文档提交） |
+| git 仓库 | 已建（`master` 分支，已配置 GitHub 远端） |
 | 远端 | `git@github.com:GodBook/DeskTile.git`（**SSH，不是 HTTPS**，原因见下） |
 | 提交身份 | 仓库级占位身份 `DeskTile Dev <dev@localhost>`，**全局 git config 未被改动** |
 | 标签 | `v1.0.0`（带完整版本说明） |
@@ -54,13 +55,15 @@ git remote set-url origin https://github.com/GodBook/DeskTile.git
 | Windows SDK | 10.0.26100.0（另有 10.0.19041.0） | 实际文件在 `C:\Program Files (x86)\Windows Kits\10` |
 | 开发者模式 | 已开启 | 见 §1.2 第 1 条 |
 | JDK | Temurin **24.0.1**，`D:\ssoftware\JAVA24` | 完整 JDK（含 `javac`、`jmods`）。另有 Temurin 21.0.7 LTS 在 `D:\software\MCreator\jdk`（MCreator 自带），可作备用 |
-| Android SDK | `D:\dev\android-sdk`，5.8 GB | 2026-08-22 装好，包清单见 §10 ① |
-| Android 设备 | ❌ 无 | `adb devices` 为空。已定方案：创建模拟器（系统镜像已下好） |
+| Android SDK | `D:\dev\android-sdk` | API 35/36、Build Tools 36.0/36.1、NDK 28.2、CMake 3.22.1，详见 §10.1 |
+| Android 设备 | `DeskTile_API36` | Pixel 6、Android 16 / API 36、`google_apis/x86_64`；当前设备号通常为 `emulator-5554` |
 
-`flutter doctor -v` 目前 Windows / Visual Studio / Network 全部 ✅；**Android toolchain 仍报 ✗**，
-因为 SDK 装好了但还没执行 `flutter config --android-sdk`（见 §10 ①「还差什么」）。
+`flutter doctor -v` 已识别 Android SDK、模拟器和 JDK。Android toolchain 仍显示 `!`，
+仅因为新版 Android CLI 与 Flutter 的 license 检测不兼容而报 `license status unknown`；
+实际 Debug APK 已反复构建成功。Network 检查会因 `maven.google.com` 超时显示 `!`，
+Gradle 实际经 `dl.google.com` 下载依赖，不影响构建。
 
-### 1.2 三个必须知道的环境坑
+### 1.2 四个必须知道的环境坑
 
 **① 开发者模式（已解决，动过注册表）**
 
@@ -117,11 +120,18 @@ set "UCRTContentRoot=C:\Program Files (x86)\Windows Kits\10\"
 顺带两条：`.bat` 文件必须保持纯 ASCII（本机控制台是 GBK 代码页，UTF-8 中文注释会让 cmd 解析炸掉）；
 `tool/flutter-msvc.bat` 里硬编码了 `D:\dev\flutter\bin`，Flutter 换位置要改这里。
 
+**④ Android 构建必须使用专用 Gradle 用户目录**
+
+全局 `C:\Users\awxds\.gradle\init.gradle` 会改写仓库配置，与 Flutter/AGP 的
+repositories 策略冲突。DeskTile 已验证可用的隔离目录是
+`C:\Users\awxds\.gradle-desktile`。构建 Android 前必须设置 `GRADLE_USER_HOME`，
+不要删除或修改用户的全局 Gradle 配置。
+
 ### 1.3 常用命令
 
 ```bash
 tool/flutter-msvc.bat analyze                  # 静态检查，目前 0 问题
-tool/flutter-msvc.bat test                     # 全部 117 个测试
+tool/flutter-msvc.bat test                     # 全部 131 个测试
 tool/flutter-msvc.bat test test/ui_test.dart   # 只跑界面测试
 tool/flutter-msvc.bat run -d windows           # 调试运行（主窗口模式）
 tool/flutter-msvc.bat build windows --release  # 出包
@@ -129,6 +139,21 @@ tool/flutter-msvc.bat build windows --release  # 出包
 
 产物：`build\windows\x64\runner\Release\desktile.exe`（整个 Release 目录一起拷才能跑，
 Dart 代码在 `data\app.so`，插件 DLL 和 `data\flutter_assets\` 都要带上）。
+
+Android 构建固定使用以下环境（PowerShell）：
+
+```powershell
+$env:JAVA_HOME='D:\ssoftware\JAVA24'
+$env:ANDROID_HOME='D:\dev\android-sdk'
+$env:ANDROID_SDK_ROOT='D:\dev\android-sdk'
+$env:GRADLE_USER_HOME='C:\Users\awxds\.gradle-desktile'
+D:\dev\flutter\bin\flutter.bat build apk --debug
+D:\dev\flutter\bin\flutter.bat build apk --release
+D:\dev\flutter\bin\flutter.bat build appbundle --release
+```
+
+操作模拟器时显式使用 `D:\dev\android-sdk\platform-tools\adb.exe`，避免 PATH 里的
+另一份 Platform Tools 抢到设备连接。
 
 灌示例数据（用的是真实的导入代码，不是手写 JSON）：
 
@@ -159,6 +184,9 @@ dart run tool/seed_demo_data.dart --export-cses out.yaml
 （另：SDK zip 有 1.79GB，第一次下载被服务器中断过一次，用 `curl -C -` 续传补齐后
 `Content-Length` 完全吻合。以后重下记得带 `-C -`。）
 
+Android 依赖方面，`maven.google.com` 在本机仍会超时，但 `google()` 解析到的
+`https://dl.google.com/dl/android/maven2/` 可正常下载并完成构建。
+
 ---
 
 ## 2. 产品范围
@@ -182,19 +210,29 @@ dart run tool/seed_demo_data.dart --export-cses out.yaml
   值是 `"<exe>" --widget`，不需要管理员权限
 - **主题**：跟随系统 / 浅色 / 深色
 
-### 2.2 明确不做（当时和需求方确认过的）
+### 2.2 已实现（Android）
+
+- **手机界面**：底部四栏导航、状态栏/手势区 `SafeArea`、横向课表滚动、320px 窄屏课程编辑器
+- **主屏小组件**：Glance 展示周次、下一节、教室、今日剩余和最近考试；支持从应用请求固定到主屏
+- **数据刷新**：课表保存后约 300ms 内刷新小组件，前台每分钟刷新倒计时，后台每 30 分钟刷新
+- **课程提醒**：设备 IANA 时区 + `exactAllowWhileIdle`，每天本地 00:05 重排未来 7 天
+- **系统恢复**：通知插件 receiver 恢复开机前闹钟，WorkManager 与 Glance 实例在重启后保留
+- **权限与引导**：只在用户明确开启/重排/测试提醒时请求权限；设置页可打开系统应用详情
+- **跨端数据**：沿用备份 JSON 导入导出，无需新增 Android 专用数据格式
+
+### 2.3 明确不做（当时和需求方确认过的）
 
 账号系统、云同步、广告位、课程社区。也没有引入 SQLite、状态管理库、多窗口插件，
 理由见 §3.2。
 
-### 2.3 未实现
+### 2.4 未实现 / 发布前事项
 
 | 项 | 状态 |
 |---|---|
-| Android 端（含 Glance 桌面小组件、精准闹钟） | Phase 2，见 §10。核心逻辑已就绪 |
 | 教务系统直连（登录 + 抓课表） | Phase 3，见 §11。解析通路已预留 |
 | 多张课表切换 | 数据结构支持（`timetables` 是数组、有 `activeTimetableId`），界面没做入口 |
 | 课程冲突提示 | `CourseSession.overlaps()` 已实现且可用，界面没接 |
+| Android 发布准备 | 生产签名和正式图标已完成；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
 
 ---
 
@@ -223,8 +261,13 @@ dart run tool/seed_demo_data.dart --export-cses out.yaml
   两个进程共用：
     core/    纯 Dart 领域层，不 import flutter，测试全覆盖
     data/    AppData（纯数据）· DataStore（原子读写 + 监听）· AppState（ChangeNotifier）
-    platform/ 窗口 · 托盘 · 通知 · 自启 · 单实例
+    platform/ 窗口 · 托盘 · 跨平台通知 · Android 后台任务/小组件桥
 ```
+
+Android 不使用桌面的双进程路径。`main.dart` 先判断 `Platform.isAndroid`，加载同一份
+`AppState` 后直接运行 `MainApp`；状态变化经 300ms 防抖同步 HomeWidget payload，
+课表变化还会重排提醒。应用退到后台后，WorkManager 在独立 isolate 中读取
+`desktile_data.json`，分别刷新 Glance 小组件和每日提醒。
 
 ### 3.2 六个关键决策与理由
 
@@ -288,6 +331,7 @@ Flutter Windows 的透明窗口有已知的发黑问题。现在的做法是
 | `agenda.dart` | 112 | `ResolvedSession`、`sessionsOnWeekDay`、`agendaForDate`、`currentSession`、`nextSession`、`remainingToday` |
 | `reminder_plan.dart` | 92 | `buildReminders()` → `PlannedReminder` 列表，见 §6.2 |
 | `exam_countdown.dart` | 59 | `upcomingExams` / `pastExams` / `formatRemaining` |
+| `widget_payload.dart` | 159 | 组装 Android 小组件所需的紧凑 JSON：周次、下一节、今日剩余、最近考试；纯 Dart、可测试 |
 
 ### `lib/core/import/` — 所有格式先转成同一个中间结构
 
@@ -310,30 +354,33 @@ Flutter Windows 的透明窗口有已知的发黑问题。现在的做法是
 | `app_state.dart` | 148 | `AppState`（ChangeNotifier）+ `AppScope`（InheritedNotifier）。写入方法：`updateSettings` / `setActiveTimetableId` / `updateActiveTimetable` / `putTimetable` / `deleteTimetable` / `putExam` / `deleteExam` / `mutateSettingsSafely` |
 | `widget_position.dart` | 47 | 挂件位置单独存 `widget_pos.json` |
 
-### `lib/platform/` — 全部 Windows 相关
+### `lib/platform/` — 平台集成
 
 | 文件 | 行 | 职责 |
 |---|---|---|
 | `desktop_window.dart` | 87 | `isWidgetMode(args)`、`setupMainWindow()`、`setupWidgetWindow()`、`applyWidgetAppearance()`、`defaultWidgetPosition()`（贴主屏右下角）、两种挂件尺寸常量 |
 | `tray.dart` | 121 | 托盘图标与菜单（显示/隐藏挂件、迷你模式、贴桌面、打开主窗口、开机自启、退出）；左键点图标显示挂件、右键弹菜单 |
-| `notifications.dart` | 160 | `ReminderService`：初始化（含在 `HKCU\Software\Classes\AppUserModelId` 下登记 AUMID）、`reschedule()`、`scheduleTest()`、`pendingCount()` |
+| `notifications.dart` | 202 | 跨平台 `ReminderService`；Windows 注册 AUMID，Android 读取 IANA 时区并请求通知/精准闹钟权限 |
 | `autostart.dart` | 29 | 读写 `Run` 键 |
 | `windows_registry.dart` | 50 | 直接调 `reg.exe` 的极简封装。**没用 `win32_registry`**，因为它依赖的 win32 版本和 `file_picker 12` 冲突 |
 | `single_instance.dart` | 95 | 绑定回环端口当互斥锁（挂件 45677 / 主窗口 45678），兼作「唤起已有窗口」的 IPC；`ModeLauncher` 启动另一种模式的进程 |
+| `android_widget.dart` | 65 | Dart → HomeWidget 桥：保存 payload、触发 Glance 更新、请求固定到主屏 |
+| `android_background.dart` | 91 | WorkManager dispatcher；30 分钟小组件刷新、每日 00:05 提醒重排、旧 v1 任务迁移 |
+| `android_system_settings.dart` | 21 | MethodChannel 打开当前应用的 Android 系统详情页 |
 
 ### `lib/ui/`
 
 | 文件 | 行 | 职责 |
 |---|---|---|
 | `theme.dart` | 57 | M3 主题、10 色课程配色板、`courseColor(seed)`、日期/时刻格式化 |
-| `app.dart` | 98 | 主窗口壳（NavigationRail 四个页面） |
-| `pages/timetable_page.dart` | 429 | 周视图：`_Toolbar` / `_Grid`（表头固定，只纵向滚动）/ `_TimeColumn` / `_DayColumn`（Stack + Positioned 放课程块）/ `_CourseBlock`（按可用高度决定显示到教室还是教师） |
-| `pages/session_editor.dart` | 337 | 课程时段编辑弹窗；保存时同名同教师复用 Course，并清理没有时段的孤儿课程 |
+| `app.dart` | 139 | 主界面壳：宽屏 `NavigationRail`，手机底部 `NavigationBar`，内容统一避开系统安全区 |
+| `pages/timetable_page.dart` | 527 | 响应式周视图：手机可横向滚动；课程块按可用高度决定显示到教室还是教师 |
+| `pages/session_editor.dart` | 365 | 课程时段编辑弹窗；320px 窄屏字段纵向重排；保存时复用 Course 并清理孤儿课程 |
 | `pages/exams_page.dart` | 321 | 考试列表 + 编辑弹窗 |
 | `pages/import_export_page.dart` | 442 | 格式说明、选文件导入、`showImportPreview()`（公开出来是为了能测）、三个导出动作 |
-| `pages/settings_page.dart` | 409 | 学期 / 节次时间表 / 提醒 / 挂件 / 启动与外观五组设置 |
+| `pages/settings_page.dart` | 602 | 学期 / 节次 / 提醒 / Android 后台可靠性与主屏小组件 / 桌面挂件 / 外观设置 |
 | `widget_app.dart` | 380 | 挂件：`_WidgetSurface`（拖动 + 位置保存 + 20s 刷新计时器）、`_Header`、`_NextUp`、`_TodayList`、`_ExamLine` |
-| `main.dart` | 131 | 按 `--widget` 分流；两种模式各自的启动序列；挂件里的每日 00:05 重排 |
+| `main.dart` | 202 | Android/Windows 启动分流；Android 状态同步；Windows 两种进程与每日重排 |
 
 ---
 
@@ -433,18 +480,19 @@ AppData
   「早八不知道在哪间教室」是这个功能存在的理由，所以 room 不是可选装饰。
 - id 由 `stableHash('年-月-日|sessionId')` 得出，决定性。
 
-`platform/notifications.dart` 负责落地：滚动排未来 7 天，触发点是
-①应用启动 ②数据/设置变更（挂件监听到）③每天 00:05（`main.dart` 的 `_armDailyRefresh`）。
-每次都先 `cancelAll()` 再全量写入。
+`platform/notifications.dart` 负责落地：滚动排未来 7 天，每次都先 `cancelAll()` 再全量写入。
+Windows 在应用/挂件启动、数据变化和每天 00:05 重排；Android 在应用启动、课表变化和
+WorkManager 每日任务中重排。Android 周期任务的唯一名是 `desktile_reminder_refresh_v2`：
+旧版任务的 30 分钟 flex 会把首次执行额外推迟约 23.5 小时，初始化时会先取消 v1 再迁移。
 
-Windows 侧两个细节：
+平台侧三个细节：
 - 未打包的 Win32 程序要让 Toast 显示正确的应用名和图标，得在
   `HKCU\Software\Classes\AppUserModelId\DeskTile.KeBiaoDao.Desktop` 下写
   `DisplayName` 和 `IconUri`，`init()` 里自动做了，纯用户级。
-- 传给 `zonedSchedule` 的时刻用 `tz.TZDateTime.from(fireAt, tz.UTC)`。
-  这是刻意的：Windows 插件只读 `millisecondsSinceEpoch`，用 UTC 表示同一瞬间完全等价，
-  能省掉查系统 IANA 时区名这一大堆麻烦。**接 Android 时必须改成真正的本地时区**
-  （代码里有注释标记）。
+- Windows 的 `_scheduleLocation` 保持 UTC，插件按绝对时间戳调度；Android 通过
+  `flutter_timezone` 读取设备 IANA 名并使用对应 `tz.Location`，避免非 UTC 地区和 DST 漂移。
+- Android 用 `exactAllowWhileIdle`；通知权限与精准闹钟权限只允许由设置页中的明确用户操作请求，
+  WorkManager 后台任务不会尝试弹权限页。Manifest 已注册定时通知和开机恢复 receiver。
 
 ### 6.3 桌面挂件与双进程
 
@@ -491,11 +539,25 @@ Windows 侧两个细节：
   **有周日的课直接拒绝导出并说明原因**。周次既不是每周也不是单/双周的时段会被跳过，
   每一条都进 warnings 并在界面上提示。导出结果已用官方 `cses.schema.json` 校验通过。
 
+### 6.6 Android 主屏小组件
+
+`buildWidgetPayload()` 复用 `agenda.dart` 和 `exam_countdown.dart`，输出稳定 JSON；
+`AndroidWidgetService` 用 HomeWidget shared preferences 写入，再按 receiver 全限定名触发更新。
+原生 `DeskTileGlanceWidget` 防御性解析 payload，并在整块点击时打开 `MainActivity`。
+
+刷新链路有三层：
+
+1. 前台状态保存后 300ms 防抖即时更新；只有课表变化才同时重排提醒
+2. 前台每分钟重算下一节与倒计时
+3. WorkManager 每 30 分钟从磁盘重读；launcher 的 provider 也声明 30 分钟更新周期
+
+Glance 实例和共享 payload 均能跨重启保留；新安装但尚无 payload 时显示轻量 loading 布局。
+
 ---
 
 ## 7. 测试
 
-### 7.1 清单（117 个用例）
+### 7.1 清单（131 个用例）
 
 | 文件 | 用例 | 覆盖什么 |
 |---|---|---|
@@ -507,7 +569,10 @@ Windows 侧两个细节：
 | `import_test.dart` | 17 | CSV（9 行全过、中英文星期、单双周、节次区间、部分周次、装配后同名课合并、缺列报错、坏行进警告）、JSON（两种 sections 写法、sectionTimes、裸数组、DTO 往返）、ICS（学期起点推算、多次事件归并、节次推算） |
 | `cses_test.dart` | 13 | CSES 导入（配置名、节次推算、两循环周合并成每周、单周、非整数周报错、3 周循环报错）+ 导出（两周循环、单双周分表、subjects 带教师教室、**导出再导入一致**、无法表达的跳过、周日拒绝导出） |
 | `store_test.dart` | 7 | 首次运行初始数据、存取往返不丢、不留 `.tmp`、损坏备份兜底、顶层非对象兜底、`schemaVersion`、`newId` 不重复 |
-| `ui_test.dart` | 6 | 周视图渲染、**切周后单周课消失/每周课保留**、考试页（倒计时/考场/座位/已结束折叠）、挂件标准与迷你形态、导入预览确认后落盘 |
+| `ui_test.dart` | 10 | 原有周视图/单双周/考试/挂件/导入覆盖，加手机 SafeArea + 底部导航、宽屏侧栏、320px 编辑器和 Android 通知图标资源回归 |
+| `widget_payload_test.dart` | 2 | Android 小组件 payload 的课表/考试装配、学期外兜底和 JSON 往返 |
+| `android_background_test.dart` | 3 | 本地 00:05 前后边界，以及午夜前的次日延迟计算 |
+| `reminder_permission_policy_test.dart` | 5 | Android 权限只在开启提醒或明确重新排定时请求，普通设置和非 Android 不请求 |
 
 `docs/示例课表.csv` 和 `docs/示例课表.cses.yaml` 既是用户模板也是测试 fixture，
 改动它们会影响 `import_test` / `cses_test` 的断言。
@@ -536,8 +601,8 @@ Windows 侧两个细节：
 | 项 | 怎么验的 | 结果 |
 |---|---|---|
 | 静态检查 | `flutter analyze` | 0 问题（含 lint info） |
-| 单元/界面测试 | `flutter test` | 117/117 通过 |
-| Release 构建 | `build windows --release` | 成功，`desktile.exe` + `data\app.so` |
+| 单元/界面测试 | `tool\flutter-msvc.bat test` | 131/131 通过 |
+| Windows Release | `tool\flutter-msvc.bat build windows --release` | 成功；进程 5 秒保持响应，实际加载 `flutter_timezone_plugin.dll` |
 | 主窗口渲染 | 灌示例数据后实机运行，`PrintWindow` 抓窗口 | 见 `docs/screenshots/主窗口-周视图.png` |
 | 挂件渲染 | 同上 | 见 `docs/screenshots/桌面挂件.png` |
 | 单双周（第 1 周） | 实机 + 界面测试 | 周二 1-2 节是线性代数（单周） |
@@ -547,6 +612,15 @@ Windows 侧两个细节：
 | 跨进程同步 | 外部改写 JSON 里的课名，前后各抓一次挂件窗口对比 | ~1 秒内挂件文字跟着变，见 `docs/screenshots/跨进程同步-前后对比.png`（上=改前，下=改后） |
 | CSES 导出正确性 | 导出后用官方 `cses.schema.json`（draft-07）+ `jsonschema` 校验 | PASS；`docs/示例课表.cses.yaml` 也 PASS |
 | CSES 往返 | `cses_test.dart` | 导出再导入，星期/周次/节次数量一致 |
+| Android Debug 构建 | 专用 `GRADLE_USER_HOME` + `flutter build apk --debug` | 成功，APK 约 180 MB，可覆盖安装到 API 36 模拟器 |
+| Android Release 签名 | `flutter build apk/appbundle --release` + `apksigner` / `jarsigner` | APK 54.5 MB、AAB 53.2 MB；RSA 4096，APK v2 通过，AAB `jar verified` |
+| 正式应用图标 | SVG 母版 + Android adaptive/monochrome/legacy + Windows ICO | 已替换 Flutter 默认图标；通知使用独立单色小图标 |
+| Android 手机布局 | Pixel 6 API 36 竖屏 + widget tests | 底部导航、安全区、横向课表、窄屏编辑器均无溢出；见 `docs/screenshots/Android-主界面.png` |
+| Glance 小组件 | Pixel Launcher 添加组件并修改课程 | Provider/实例正常；`RefreshTest / A101` 保存后约 300ms 即时更新，见 `Android-小组件*.png` |
+| Android 测试提醒 | 设置页“10 秒后测试提醒” + 通知中心 | 修复 `invalid_icon` 后通知成功发布；Release 资源表保留 `drawable/ic_notification`，见 `Android-10秒提醒-修复验证.png` |
+| 本地时区排定 | 读取插件缓存 | `scheduledDateTime=2026-08-24T07:30:00`，`timeZoneName=Asia/Shanghai` |
+| Android 重启恢复 | 有未触发提醒时重启模拟器，不先打开 App | receiver 恢复同一绝对时刻；Glance 实例和 v2 周期任务保留，WorkManager `successful_finish` |
+| 后台可靠性入口 | 设置页点击“打开应用详情” | 前台切到 `com.android.settings/.spa.SpaActivity`，标题为“DeskTile 课表岛”；见 `Android-后台可靠性.png` |
 
 **已知缺陷 1 项**：
 
@@ -569,6 +643,12 @@ Windows 侧两个细节：
 - **两个进程各占约 120MB 内存**，都开着约 240MB。Flutter 桌面的常态。
 - **挂件是 `alwaysOnBottom`**，所以任何全屏程序都会盖住它 —— 这是「贴桌面」的设计意图，不是故障。
 - **提醒依赖挂件进程常驻**（或主窗口开着）。Windows 计划 Toast 由系统触发，但排定动作需要应用跑一次；所以「开机自启挂件」这个开关对提醒的可靠性很关键。
+- **Android 模拟器不能代表国产 ROM 的后台策略**：receiver、WorkManager 和闹钟链路已验证，
+  但杀后台、自启动白名单和省电限制仍必须在至少一台真实手机上验证。
+- **Android 签名文件只存在本机且被 Git 忽略**：首次发布前必须按
+  `android/签名说明.md` 备份 keystore 和 `key.properties`；丢失可能导致无法更新已发布应用。
+- Android 30 分钟刷新由 WorkManager/launcher 调度，只保证最终执行，不保证精确到分钟；
+  课程保存时的前台即时刷新不受此限制。
 - **CSES 表达能力有限**：周日的课导不出去，非每周/单双周的周次会被跳过。这是格式本身的限制，代码里已经明确报错/警告而不是静默错。
 - **ICS 的节次是推算的**，一段可能对应现实里连续两节；导入后建议去设置里核对节次时间表。
 - **`docs/` 下的示例文件同时是测试 fixture**，改了要同步改断言。
@@ -578,111 +658,75 @@ Windows 侧两个细节：
 
 ---
 
-## 10. Phase 2：Android 落地步骤
+## 10. Phase 2：Android 完成状态
 
-工程里 `android/` 目录在 `flutter create` 时已经生成好了，不用重建。
+Phase 2 已于 2026-08-22 完成。Android 与 Windows 共用领域层、
+数据文件和主界面页面；仅启动序列、系统通知、后台任务与小组件桥按平台分流。
 
-**① 装工具链 —— 已完成（2026-08-22）**
+### 10.1 工具链
 
-不需要再装 JDK：`D:\ssoftware\JAVA24` 是 Temurin **JDK 24.0.1** 完整版。
-一开始担心「JDK 24 对 AGP 太新」，在这个工程上不成立 —— 本项目用 Gradle 9.3.1 +
-AGP 9.1.0 + Kotlin 2.4.0，都支持 JDK 24。`android/app/build.gradle.kts` 里的
-`sourceCompatibility = VERSION_17` / `jvmTarget = JVM_17` 只是**字节码目标**，
-和跑 Gradle 用哪个 JDK 是两件事。
-
-Android SDK 装在 `D:\dev\android-sdk`（5.8 GB），已装：
-
-| 包 | 版本 |
+| 组件 | 版本 / 状态 |
 |---|---|
-| `platform-tools` | 37.0.1 |
-| `platforms/android-36` | 2.0.0 |
-| `build-tools/36.1.0` | 36.1.0 |
-| `emulator` | 37.1.11 |
-| `system-images/android-36/google_apis/x86_64` | 7.0.0 |
-| `cmdline-tools/latest` | 已装（有 23.0.0 更新可用，不影响使用） |
+| JDK | Temurin 24.0.1，`D:\ssoftware\JAVA24` |
+| Gradle / AGP / Kotlin | 9.3.1 / 9.1.0 / 2.4.0；字节码目标 JVM 17 |
+| Android SDK | API 35、36；Build Tools 36.0.0、36.1.0 |
+| 原生工具 | NDK 28.2.13676358、CMake 3.22.1、Platform Tools 37.0.1 |
+| 模拟器 | `DeskTile_API36`，Pixel 6，Android 16 / API 36，Google APIs x86_64 |
 
-版本是照 Flutter 3.47.1 的硬编码要求选的 ——
-`D:\dev\flutter\packages\flutter_tools\gradle\src\main\kotlin\FlutterExtension.kt`
-里写死 `compileSdkVersion = 36`、`minSdkVersion = 24`、`targetSdkVersion = 36`、
-`ndkVersion = "28.2.13676358"`。
+Flutter 3.47.1 的模板要求 compile/target SDK 36、min SDK 24、NDK 28.2.13676358。
+新 Android CLI 认为 license 已无需单独接受，但 Flutter doctor 仍显示
+`Android license status unknown`；这是工具兼容提示，不是构建阻断。
 
-**NDK 故意没装**（`ndk/28.2.13676358`，约 700 MB）。DeskTile 是纯 Dart 应用，
-不触发原生 C++ 构建。真需要时补一条：
+Android 构建必须使用 §1.3 的四个环境变量，尤其是专用
+`GRADLE_USER_HOME=C:\Users\awxds\.gradle-desktile`。全局 Gradle init 脚本会破坏构建。
 
-```bash
-JAVA_HOME="D:\ssoftware\JAVA24" \
-  D:/dev/android-sdk/cmdline-tools/latest/bin/sdkmanager.bat \
-  --sdk_root="D:\dev\android-sdk" "ndk/28.2.13676358"
-```
+### 10.2 已落地的依赖与原生层
 
-安装时踩到的两点：
+新增依赖为 `home_widget 0.9.3`、`flutter_timezone 5.0.1`、`workmanager ^0.10.9`；
+Android app 显式依赖 `androidx.glance:glance-appwidget:1.1.1`、Compose 插件和
+`desugar_jdk_libs 2.1.4`。Manifest 已补齐通知、精准闹钟、开机恢复、小组件 receiver；
+应用正式标签为 `DeskTile 课表岛`，应用 ID 固定为 `com.desktile.desktile`。
 
-- **`sdkmanager` 已被弃用**，会自动转发给新的 Android CLI（1.0.15985488）。
-  包名分隔符也从 `;` 变成了 `/` —— 现在要写 `platforms/android-36`，
-  老文档里的 `platforms;android-36` 在 `--list` 输出里查不到。
-- **`maven.google.com` 被墙**（20 秒超时），但 `dl.google.com` 通
-  （148 MB 的 cmdline-tools 6 秒下完，2 GB 的包一路顺）。
-  这不影响 Gradle —— `google()` 仓库实际解析到 `dl.google.com/dl/android/maven2/`。
-  真到构建阶段卡在依赖下载，先怀疑这里。
-  cmdline-tools 下载地址是从官方包索引
-  `https://dl.google.com/android/repository/repository2-3.xml` 里捞的最新构建号
-  （当时是 `commandlinetools-win-16111833_latest.zip`，154,957,218 字节）。
+原生新增：
 
-**还差什么（下次从这里接）**
+- `DeskTileGlanceWidget.kt` / `DeskTileWidgetReceiver.kt`：Glance 渲染与 launcher 入口
+- `desktile_widget_info.xml` / `desktile_widget_loading.xml`：尺寸、30 分钟周期和初始布局
+- `MainActivity.kt` MethodChannel：打开 `ACTION_APPLICATION_DETAILS_SETTINGS`
+- `assets/课表岛图标.svg`：正式图标母版；Android 自适应/主题/传统图标和 Windows ICO 均由此生成
+- `drawable/ic_notification.xml`：Android 状态栏专用单色通知图标
 
-```bash
-flutter config --android-sdk D:\dev\android-sdk
-flutter doctor --android-licenses        # 需要交互式接受
-flutter doctor -v                        # 确认 Android toolchain 变 ✓
-```
+### 10.3 Dart 与后台链路
 
-**验证设备已定为模拟器**（不是真机）。本机跑得动：i7-14650HX 16 核 24 线程、
-31.7 GB 内存、`HypervisorPresent = True`（WHPX 可用）、C: 68 GB / D: 219 GB 空闲。
-系统镜像已经下好，剩下用 `avdmanager` 建 AVD 并启动，确认 `adb devices` 能看到。
+- `main.dart` 在任何 Windows 插件初始化前先分流 Android，避免托盘、窗口、单实例代码误调用
+- `widget_payload.dart` + `android_widget.dart` 负责 payload 计算、保存、刷新与请求固定到主屏
+- `android_background.dart` 注册两个周期任务：小组件每 30 分钟、提醒每天本地 00:05
+- 提醒通过 `flutter_timezone` 使用设备 IANA 时区，调度模式为 `exactAllowWhileIdle`
+- 权限策略只响应明确的用户动作；普通设置修改不会重复弹通知或精准闹钟权限
+- 设置页的“后台可靠性”说明国产 ROM 风险，并可跳到系统应用详情页
 
-选模拟器的代价要记住：**模拟器没有国产 ROM 的杀后台行为**，所以第 ④ 步里
-「提醒在真实设备上到底可不可靠」这件事在模拟器上验不到，最终还是要装到真机上确认一次。
+### 10.4 已完成的模拟器验收
 
-**② 加依赖**
+API 36 的 `DeskTile_API36` 已验证：
 
-`home_widget: ^0.9.3`（当时核对过：要求 Flutter ≥ 3.38.1，与 3.47.1 兼容）。
-Android 侧 Gradle 里加 Jetpack Glance 依赖。
+1. Glance 小组件可添加到 Pixel Launcher，课程保存后约 300ms 即时刷新
+2. 10 秒测试提醒成功发布，精准闹钟 AppOp 为 `allow`；通知图标使用裸资源名
+   `ic_notification`，并由 `res/raw/keep.xml` 防止 Release 资源收缩器裁掉
+3. 排定缓存明确记录 `Asia/Shanghai` 与本地 `2026-08-24T07:30:00`
+4. 模拟器重启后不打开应用，BootReceiver 仍恢复同一个绝对提醒时刻
+5. v2 周期任务和 Glance 实例跨重启保留，WorkManager 最终成功完成
+6. “打开应用详情”进入 `com.android.settings/.spa.SpaActivity`
 
-**③ 桌面小组件**
+设备重启期间系统曾临时回到 GMT，闹钟显示为 `2026-08-23 23:30`，与上海
+次日 `07:30` 正好相差 8 小时，说明保存的是正确绝对时刻，没有墙上时间漂移。
 
-- Kotlin 写 `GlanceAppWidgetReceiver` + `GlanceAppWidget`，在
-  `android/app/src/main/AndroidManifest.xml` 注册 receiver 和 `appwidget-provider` 元数据
-- Dart 侧把挂件需要的信息压成一个紧凑 payload（第几周/星期/下一节课名+教室+时刻/今日剩余/最近考试），
-  用 `HomeWidget.saveWidgetData` 写入，再 `HomeWidget.updateWidget`
-- **建议新建 `lib/core/widget_payload.dart`**：从 `agenda.dart` + `exam_countdown.dart`
-  组装那个 payload，纯函数、可测试。Windows 挂件目前是直接在 UI 里取数的，
-  Android 需要一份序列化结构，这一层抽出来两端都能用
-- 跨日刷新用 WorkManager（或 `AlarmManager` 定在每天 00:05，和桌面端的重排时机对齐）
+### 10.5 发布前仍要完成
 
-**④ 提醒**
-
-`flutter_local_notifications` 已经在依赖里，Android 侧要做的：
-
-- `zonedSchedule` 的 `androidScheduleMode` 用 `exactAllowWhileIdle`（代码里已经这么传了）
-- **把 `platform/notifications.dart` 里的 `tz.TZDateTime.from(fireAt, tz.UTC)` 换成真正的本地时区**。
-  Windows 只看绝对时间戳所以 UTC 没问题，Android 的精准闹钟要本地时区。
-  加 `flutter_timezone` 取 IANA 名，`tz.setLocalLocation(tz.getLocation(name))`
-- 权限：`POST_NOTIFICATIONS`（运行时申请）、`SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM`、
-  `RECEIVE_BOOT_COMPLETED` + 插件自带的开机重排 receiver
-- **界面里要引导用户加自启动白名单**。国产 ROM 杀后台是这类 App 提醒失效的头号原因，
-  不做引导的话用户只会觉得「提醒不准」
-
-**⑤ 数据搬运**
-
-已有的「导出备份 JSON / 导入 JSON」就是跨端通路，Android 端直接复用
-`json_importer.dart`（它认自有备份格式）。
-
-**⑥ 平台判断**
-
-`platform/` 下的文件目前全是 Windows 实现，`desktop_window.dart` 里有
-`supportsDesktopWidget`（`Platform.isWindows`）可以作为分流点。
-`windows_registry.dart` / `autostart.dart` / `tray.dart` / `single_instance.dart`
-在 Android 上不该被调用 —— 加 Android 时要在 `main.dart` 里按平台分流启动序列。
+- 至少在一台国产 ROM 真机验证通知权限、精准闹钟、锁屏待机、重启、自启动白名单与省电限制
+- 按 `android/签名说明.md` 将 keystore 与口令文件备份到至少两个加密位置
+- 首次上架时确定是否启用 Play App Signing；当前 RSA 4096 密钥可作为 upload key
+- 根据发布渠道决定是否输出 AAB、拆分 ABI，以及是否缩减约 180 MB 的通用 Debug APK
+- 从 1024px 正式母版继续制作 Play 商店展示图、功能横幅和隐私政策页面
+- Flutter 构建会提示未来迁移 Built-in Kotlin；当前由 Flutter 模板和插件产生，不影响本次构建
 
 ---
 
@@ -732,9 +776,14 @@ GitHub 上有大量按这个约定写好的各校解析器（正方新旧版、�
 | `Building with plugins requires symlink support` | 开发者模式被关了。见 §1.2 ① |
 | `No CMAKE_CXX_COMPILER could be found` | 通常是 ucrt 那个问题的**表层症状**（CMake 的编译器探测在链接步失败）。看 `build\windows\x64\CMakeFiles\CMakeConfigureLog.yaml` 里的真实错误 |
 | CMake 报错改完还是同样的错 | CMake 会缓存失败结果，`rm -rf build` 再来 |
+| Android 构建报 repositories mode / 仓库策略错误 | 没设置专用 `GRADLE_USER_HOME=C:\Users\awxds\.gradle-desktile`，误用了全局 `.gradle\init.gradle`。见 §1.2 ④ |
+| `flutter doctor` 报 `Android license status unknown` | 新 Android CLI 与 Flutter 3.47.1 检测不兼容；本机 APK 已能构建。不要把它误判成 Phase 2 阻断 |
+| `adb` 偶发找不到或连错设备 | 本机有两份 adb；固定使用 `D:\dev\android-sdk\platform-tools\adb.exe` |
 | 测试挂死 10 分钟后超时、无错误信息 | `testWidgets` 里做了真实 IO 没包 `runAsync`。见 §7.2 ① |
 | 测试报 `RenderFlex overflowed` 但真机正常 | 测试字体行高差异。见 §7.2 ② |
 | **提醒不弹** | **① 先在设置页点「10 秒后测试提醒」，观察按钮下方有没有闪过 SnackBar 提示** ② 如果没有提示或提示里有错误，看日志里的 `lastError` ③ 系统设置里「通知」总开关和本应用开关是否都开 ④ 焦点助手是否启用（Win+A 快捷中心右下角） ⑤ `Get-Service WpnService` 是否 Running ⑥ 如果上述都正常但仍不弹，已知 Windows 11 26200 上 flutter_local_notifications_windows 3.1.1 有兼容性问题（见 §8 已知缺陷），考虑降级插件或换用 win_toast |
+| Android 提醒模拟器正常、真机失效 | 在设置页“后台可靠性”打开应用详情，允许后台运行；再按 ROM 设置自启动白名单、关闭不受控省电。见 §10.5 |
+| Android 测试提醒报 `invalid_icon` | 初始化参数必须是裸资源名 `ic_notification`，不能写 `@drawable/ic_notification`；同时确认 `res/raw/keep.xml` 保留该 drawable。 |
 | 挂件看不见 | 它是 `alwaysOnBottom`，被其它窗口盖住了。点托盘图标会 `show()`；或者在设置里关掉「贴在桌面上」改成置顶 |
 | 挂件位置乱了 | 删掉数据目录里的 `widget_pos.json`，下次启动回到主屏右下角 |
 | 双击图标没反应 | 单实例机制：已有同模式实例在跑，它会把已有窗口叫到前面。挂件被隐藏时表现为「没反应」，点托盘图标即可 |
@@ -749,15 +798,9 @@ GitHub 上有大量按这个约定写好的各校解析器（正方新旧版、�
 - 小爱课程表解析器示例（正方新版）：https://github.com/Arkitect-z/Xiaoai-Schedule-For-New-Zhengfang-System
 - `window_manager` API：https://pub.dev/documentation/window_manager/latest/
 - Flutter 桌面多窗口现状：https://docs.flutter.dev/platform-integration/desktop
-- home_widget（Phase 2 会用到）：https://pub.dev/packages/home_widget
-
-
-
-
-
-
-
-
+- home_widget：https://pub.dev/packages/home_widget
+- workmanager：https://pub.dev/packages/workmanager
+- flutter_timezone：https://pub.dev/packages/flutter_timezone
 
 
 
