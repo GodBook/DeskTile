@@ -1,16 +1,45 @@
 # DeskTile 课表岛 — 项目交接文档
 
-> 交接时间：2026-08-21 · 对应提交：Phase 1（Windows 端）完成
+> 最后更新：2026-08-22 · 对应提交：Phase 1（Windows 端）完成 + Android 环境就绪
 > 代码位置：`D:\CLAUDE\DeskTile`（原中文目录 `D:\CLAUDE\DeskTile课表岛` 未使用，见 §1.2）
+> 仓库：https://github.com/GodBook/DeskTile （私有）· 发布：`v1.0.0`（带 Windows x64 免安装包）
 > 规模：`lib/` 37 个文件 5399 行，`test/` 10 个文件 1303 行 / 117 个用例
 
 ---
 
 ## 0. 现状一句话
 
-Windows 端功能完整、构建通过、117 个测试全绿、实机跑过并截图；
-Android 端**一行都没写**，但跨平台核心逻辑（周次计算、单双周、提醒计划、导入解析）
-已经全部在 `lib/core/` 里做完并被测试覆盖，Android 只需要接原生小组件和闹钟。
+**Windows 端**功能完整、构建通过、117 个测试全绿、实机跑过并截图，已打包发布到 GitHub Release；
+唯一已知缺陷是 Toast 弹窗在本机 Windows 11 26200 上不显示（排定逻辑正确，见 §8）。
+
+**Android 端**：工具链和 SDK 已经装好（JDK 24 + Android SDK 36 + 模拟器镜像，见 §1.1 / §10 ①），
+但**代码一行都没改**。跨平台核心逻辑（周次计算、单双周、提醒计划、四种导入解析）
+早就在 `lib/core/` 里做完并被测试覆盖，Android 剩下的是接原生小组件、精准闹钟、
+以及把提醒的时区处理从 UTC 换成真本地时区。
+
+**下次接手的第一件事**：§10 ①「还差什么」那三条命令。
+
+---
+
+## 0.1 版本控制与发布状态
+
+| 项 | 状态 |
+|---|---|
+| git 仓库 | 已建（`master` 分支，2 个提交 + 1 个文档提交） |
+| 远端 | `git@github.com:GodBook/DeskTile.git`（**SSH，不是 HTTPS**，原因见下） |
+| 提交身份 | 仓库级占位身份 `DeskTile Dev <dev@localhost>`，**全局 git config 未被改动** |
+| 标签 | `v1.0.0`（带完整版本说明） |
+| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.0.0 · 附件 `DeskTile-v1.0.0-windows-x64.zip`（11.8 MB） |
+
+**为什么 remote 是 SSH**：本机 `github.com:443` 被墙（20 秒超时），
+但 `github.com:22` 和 `ssh.github.com:443` 都通，`~/.ssh/id_ed25519` 也早就绑好了
+（`ssh -T git@github.com` 返回 `Hi GodBook!`）。而 `api.github.com` 和
+`uploads.github.com` 是通的 —— 所以 `gh` 的 API 操作（建仓库、发 Release、传附件）
+一切正常，只有 git 传输需要走 SSH。换网络环境后想切回 HTTPS：
+
+```bash
+git remote set-url origin https://github.com/GodBook/DeskTile.git
+```
 
 ---
 
@@ -24,9 +53,12 @@ Android 端**一行都没写**，但跨平台核心逻辑（周次计算、单�
 | VS Build Tools 2022 | 17.14.37，含 MSVC 14.44.35207 + ATL | `flutter doctor` 认它，不需要装完整 Visual Studio |
 | Windows SDK | 10.0.26100.0（另有 10.0.19041.0） | 实际文件在 `C:\Program Files (x86)\Windows Kits\10` |
 | 开发者模式 | 已开启 | 见 §1.2 第 1 条 |
-| Android 工具链 | ❌ 无 JDK、无 Android SDK | 只有 winget 装的 adb 37.0.1，`adb devices` 为空 |
+| JDK | Temurin **24.0.1**，`D:\ssoftware\JAVA24` | 完整 JDK（含 `javac`、`jmods`）。另有 Temurin 21.0.7 LTS 在 `D:\software\MCreator\jdk`（MCreator 自带），可作备用 |
+| Android SDK | `D:\dev\android-sdk`，5.8 GB | 2026-08-22 装好，包清单见 §10 ① |
+| Android 设备 | ❌ 无 | `adb devices` 为空。已定方案：创建模拟器（系统镜像已下好） |
 
-`flutter doctor -v` 只有 Android toolchain 一项报错，Windows / Visual Studio / Network 全部 ✅。
+`flutter doctor -v` 目前 Windows / Visual Studio / Network 全部 ✅；**Android toolchain 仍报 ✗**，
+因为 SDK 装好了但还没执行 `flutter config --android-sdk`（见 §10 ①「还差什么」）。
 
 ### 1.2 三个必须知道的环境坑
 
@@ -550,22 +582,66 @@ Windows 侧两个细节：
 
 工程里 `android/` 目录在 `flutter create` 时已经生成好了，不用重建。
 
-**① 装工具链**
+**① 装工具链 —— 已完成（2026-08-22）**
 
-```bat
-winget install Microsoft.OpenJDK.17
-```
+不需要再装 JDK：`D:\ssoftware\JAVA24` 是 Temurin **JDK 24.0.1** 完整版。
+一开始担心「JDK 24 对 AGP 太新」，在这个工程上不成立 —— 本项目用 Gradle 9.3.1 +
+AGP 9.1.0 + Kotlin 2.4.0，都支持 JDK 24。`android/app/build.gradle.kts` 里的
+`sourceCompatibility = VERSION_17` / `jvmTarget = JVM_17` 只是**字节码目标**，
+和跑 Gradle 用哪个 JDK 是两件事。
 
-再装 Android SDK cmdline-tools（winget 里有 `Google.AndroidCLI`，或从
-developer.android.com 下 command-line tools），然后：
+Android SDK 装在 `D:\dev\android-sdk`（5.8 GB），已装：
+
+| 包 | 版本 |
+|---|---|
+| `platform-tools` | 37.0.1 |
+| `platforms/android-36` | 2.0.0 |
+| `build-tools/36.1.0` | 36.1.0 |
+| `emulator` | 37.1.11 |
+| `system-images/android-36/google_apis/x86_64` | 7.0.0 |
+| `cmdline-tools/latest` | 已装（有 23.0.0 更新可用，不影响使用） |
+
+版本是照 Flutter 3.47.1 的硬编码要求选的 ——
+`D:\dev\flutter\packages\flutter_tools\gradle\src\main\kotlin\FlutterExtension.kt`
+里写死 `compileSdkVersion = 36`、`minSdkVersion = 24`、`targetSdkVersion = 36`、
+`ndkVersion = "28.2.13676358"`。
+
+**NDK 故意没装**（`ndk/28.2.13676358`，约 700 MB）。DeskTile 是纯 Dart 应用，
+不触发原生 C++ 构建。真需要时补一条：
 
 ```bash
-sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-flutter config --android-sdk <SDK 路径>
-flutter doctor --android-licenses
+JAVA_HOME="D:\ssoftware\JAVA24" \
+  D:/dev/android-sdk/cmdline-tools/latest/bin/sdkmanager.bat \
+  --sdk_root="D:\dev\android-sdk" "ndk/28.2.13676358"
 ```
 
-**需要一台开启 USB 调试的安卓真机，或者同意创建模拟器** —— 现在 `adb devices` 是空的。
+安装时踩到的两点：
+
+- **`sdkmanager` 已被弃用**，会自动转发给新的 Android CLI（1.0.15985488）。
+  包名分隔符也从 `;` 变成了 `/` —— 现在要写 `platforms/android-36`，
+  老文档里的 `platforms;android-36` 在 `--list` 输出里查不到。
+- **`maven.google.com` 被墙**（20 秒超时），但 `dl.google.com` 通
+  （148 MB 的 cmdline-tools 6 秒下完，2 GB 的包一路顺）。
+  这不影响 Gradle —— `google()` 仓库实际解析到 `dl.google.com/dl/android/maven2/`。
+  真到构建阶段卡在依赖下载，先怀疑这里。
+  cmdline-tools 下载地址是从官方包索引
+  `https://dl.google.com/android/repository/repository2-3.xml` 里捞的最新构建号
+  （当时是 `commandlinetools-win-16111833_latest.zip`，154,957,218 字节）。
+
+**还差什么（下次从这里接）**
+
+```bash
+flutter config --android-sdk D:\dev\android-sdk
+flutter doctor --android-licenses        # 需要交互式接受
+flutter doctor -v                        # 确认 Android toolchain 变 ✓
+```
+
+**验证设备已定为模拟器**（不是真机）。本机跑得动：i7-14650HX 16 核 24 线程、
+31.7 GB 内存、`HypervisorPresent = True`（WHPX 可用）、C: 68 GB / D: 219 GB 空闲。
+系统镜像已经下好，剩下用 `avdmanager` 建 AVD 并启动，确认 `adb devices` 能看到。
+
+选模拟器的代价要记住：**模拟器没有国产 ROM 的杀后台行为**，所以第 ④ 步里
+「提醒在真实设备上到底可不可靠」这件事在模拟器上验不到，最终还是要装到真机上确认一次。
 
 **② 加依赖**
 
