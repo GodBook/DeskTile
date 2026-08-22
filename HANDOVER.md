@@ -2,7 +2,7 @@
 
 > 最后更新：2026-08-22 · 当前状态：Phase 1（Windows）完成 + Phase 2（Android）完成
 > 代码位置：`D:\CLAUDE\DeskTile`（原中文目录 `D:\CLAUDE\DeskTile课表岛` 未使用，见 §1.2）
-> 仓库：https://github.com/GodBook/DeskTile （私有）· 发布：`v1.0.0`（带 Windows x64 免安装包）
+> 仓库：https://github.com/GodBook/DeskTile （私有）· 当前发布：`v1.1.0`（Windows x64 + Android APK/AAB）
 > 规模：`lib/` 41 个文件 6258 行，`test/` 13 个文件 1563 行 / 131 个用例
 
 ---
@@ -15,10 +15,10 @@
 **Android 端 Phase 2 已完成**：单 Activity 手机界面、Jetpack Glance 主屏小组件、
 30 分钟后台刷新、IANA 本地时区精准提醒、每日重排和开机恢复均已落地。
 API 36 模拟器已验证小组件即时刷新、10 秒通知、精准闹钟、重启恢复和原生应用详情入口；
-Debug APK 位于 `build\app\outputs\flutter-apk\app-debug.apk`。
+`v1.1.0` Release 提供正式签名 APK、AAB 和 Windows x64 免安装包。
 
-**下次接手的第一件事**：若准备发布 Android，先做 §10.5 的真机后台可靠性验证、
-备份签名密钥并确定 Play App Signing；若继续产品功能，则进入 §11 的教务系统直连。
+**下次接手的第一件事**：继续做 §10.5 的国产 ROM 真机后台可靠性验证并确定
+Play App Signing；若继续产品功能，则进入 §11 的教务系统直连。
 
 ---
 
@@ -29,8 +29,8 @@ Debug APK 位于 `build\app\outputs\flutter-apk\app-debug.apk`。
 | git 仓库 | 已建（`master` 分支，已配置 GitHub 远端） |
 | 远端 | `git@github.com:GodBook/DeskTile.git`（**SSH，不是 HTTPS**，原因见下） |
 | 提交身份 | 仓库级占位身份 `DeskTile Dev <dev@localhost>`，**全局 git config 未被改动** |
-| 标签 | `v1.0.0`（带完整版本说明） |
-| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.0.0 · 附件 `DeskTile-v1.0.0-windows-x64.zip`（11.8 MB） |
+| 标签 | `v1.0.0`（Windows 首发）、`v1.1.0`（Android Phase 2） |
+| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.1.0 · Windows x64、Android APK 与 AAB |
 
 **为什么 remote 是 SSH**：本机 `github.com:443` 被墙（20 秒超时），
 但 `github.com:22` 和 `ssh.github.com:443` 都通，`~/.ssh/id_ed25519` 也早就绑好了
@@ -232,7 +232,7 @@ Android 依赖方面，`maven.google.com` 在本机仍会超时，但 `google()`
 | 教务系统直连（登录 + 抓课表） | Phase 3，见 §11。解析通路已预留 |
 | 多张课表切换 | 数据结构支持（`timetables` 是数组、有 `activeTimetableId`），界面没做入口 |
 | 课程冲突提示 | `CourseSession.overlaps()` 已实现且可用，界面没接 |
-| Android 发布准备 | 生产签名和正式图标已完成；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
+| Android 发布准备 | `v1.1.0` 正式 APK/AAB 已发布；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
 
 ---
 
@@ -724,7 +724,7 @@ API 36 的 `DeskTile_API36` 已验证：
 - 至少在一台国产 ROM 真机验证通知权限、精准闹钟、锁屏待机、重启、自启动白名单与省电限制
 - 按 `android/签名说明.md` 将 keystore 与口令文件备份到至少两个加密位置
 - 首次上架时确定是否启用 Play App Signing；当前 RSA 4096 密钥可作为 upload key
-- 根据发布渠道决定是否输出 AAB、拆分 ABI，以及是否缩减约 180 MB 的通用 Debug APK
+- 根据后续发布渠道决定是否拆分 ABI，以及是否缩减约 180 MB 的通用 Debug APK
 - 从 1024px 正式母版继续制作 Play 商店展示图、功能横幅和隐私政策页面
 - Flutter 构建会提示未来迁移 Built-in Kotlin；当前由 Flutter 模板和插件产生，不影响本次构建
 
@@ -801,8 +801,6 @@ GitHub 上有大量按这个约定写好的各校解析器（正方新旧版、�
 - home_widget：https://pub.dev/packages/home_widget
 - workmanager：https://pub.dev/packages/workmanager
 - flutter_timezone：https://pub.dev/packages/flutter_timezone
-
-
 
 
 

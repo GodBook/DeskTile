@@ -1,14 +1,22 @@
 # DeskTile 课表岛
 
-桌面极简课程表小组件。无广告、无账号、纯本地，冷启动即用。
+跨 Windows 与 Android 的极简课程表。无广告、无账号、纯本地，冷启动即用。
 
-**当前状态**：Windows 端（Phase 1）已完成并验证；Android 端（Phase 2）尚未实现，
-跨平台核心逻辑已经写好并被单元测试覆盖，Android 只需接原生小组件与闹钟。
+**当前版本：v1.1.0**。Windows 桌面挂件与 Android 手机界面、Glance 主屏小组件、
+精准课程提醒均已完成；131 个跨平台测试通过。
 
 > 接手开发请先读 **[HANDOVER.md](HANDOVER.md)** —— 环境坑、架构决策、文件职责、
 > 验证记录、Phase 2/3 落地步骤和排错手册都在那里。本文件只是使用向导。
 
 截图见 [docs/screenshots/](docs/screenshots/)。
+
+## 下载
+
+前往 [v1.1.0 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.1.0)：
+
+- `DeskTile-v1.1.0-windows-x64.zip`：Windows 10/11 x64 免安装版，完整解压后运行
+- `DeskTile-v1.1.0-android.apk`：Android 安装包
+- `DeskTile-v1.1.0-android.aab`：应用商店上传包，不能直接安装
 
 ## 已实现（Windows）
 
@@ -25,7 +33,18 @@
 - **导出**：CSES v2 YAML（可被 ClassIsland 等读取）、完整备份 JSON
 - **开机自启**：写 `HKCU\...\CurrentVersion\Run`，启动的是挂件模式，不需要管理员权限
 
+## 已实现（Android）
+
+- **手机界面**：底部四栏导航、系统安全区适配、横向课表与 320px 窄屏编辑器
+- **主屏小组件**：Jetpack Glance 展示周次、下一节、教室、今日剩余和最近考试
+- **即时刷新**：课程保存后约 300ms 更新小组件，后台每 30 分钟刷新
+- **精准提醒**：设备 IANA 时区、精准闹钟、锁屏待机调度，通知正文包含教室
+- **系统恢复**：重启后恢复通知计划、WorkManager 周期任务和 Glance 实例
+- **后台引导**：设置页可直达应用详情，便于国产 ROM 配置自启动和省电白名单
+
 ## 运行与构建
+
+### Windows
 
 本机 Windows SDK 注册表的 64 位视图指向了一个没有 `Include/Lib` 的空目录，
 CMake 驱动的 64 位 MSBuild 因此拿不到 ucrt 库路径，链接会报 `LNK1104: ucrtd.lib`。
@@ -51,6 +70,21 @@ desktile.exe --widget   # 桌面挂件 + 托盘，常驻，负责排提醒
 Flutter stable 目前不支持多窗口，所以两者是两个进程：主窗口是唯一的写入方，
 挂件只读并用 `Directory.watch` 监听数据文件变化，1 秒内自动刷新。
 每种模式各自绑定一个回环端口（45677 / 45678）当互斥锁，重复启动会把已有窗口叫到前面。
+
+### Android
+
+Android Release 必须配置 `android/key.properties` 与对应 keystore，模板和说明见
+[`android/key.properties.example`](android/key.properties.example) 与
+[`android/签名说明.md`](android/签名说明.md)。本机验证命令：
+
+```powershell
+$env:JAVA_HOME='D:\ssoftware\JAVA24'
+$env:ANDROID_HOME='D:\dev\android-sdk'
+$env:ANDROID_SDK_ROOT='D:\dev\android-sdk'
+$env:GRADLE_USER_HOME='C:\Users\awxds\.gradle-desktile'
+D:\dev\flutter\bin\flutter.bat build apk --release
+D:\dev\flutter\bin\flutter.bat build appbundle --release
+```
 
 ## 数据
 
@@ -83,7 +117,7 @@ lib/
 │  ├─ exam_countdown.dart
 │  └─ import/            course_info_dto / csv / cses / ics / json / exporter
 ├─ data/                 app_data（纯数据）、store（原子 JSON 读写 + 文件监听）、app_state
-├─ platform/             窗口、托盘、通知、开机自启、单实例
+├─ platform/             Windows 窗口/托盘与 Android 后台任务/小组件桥
 └─ ui/                   主窗口与挂件
 
 tool/
@@ -98,28 +132,23 @@ tool/
 
 已实测通过：
 
-- `flutter analyze` 无任何问题；`flutter test` 116 个测试全绿（含 5 个界面测试）
+- `flutter analyze` 无任何问题；`flutter test` 131 个测试全绿
 - Release 构建成功，主窗口与挂件都实际运行并截图确认
+- Android 正式签名 APK/AAB 构建成功；API 36 模拟器完成通知、小组件、重启恢复验收
 - 单双周：第 1 周显示单周课、第 2 周显示双周课，界面测试与真机截图双向确认
 - 早八提醒：示例课表下启动即排定 2 条（周一、周四第一节 08:00），
   `pendingNotificationRequests` 确认系统已接收
 - 跨进程同步：外部改写数据文件后挂件 ~1 秒内刷新
 - 导出的 CSES YAML 通过官方 `cses.schema.json`（draft-07）校验
 
-未能实测：
+已知限制：
 
-- **Windows Toast 的视觉弹出**。排定与系统接收都验证过，但验证时桌面有全屏程序在前台，
-  Windows 会自动抑制通知，所以没截到弹窗。请在设置页点一下「10 秒后测试提醒」自行确认。
-- Android 端全部功能（Phase 2 未开工）。
+- **Windows 11 Insider 26200 上 Toast 不弹出**。应用排定和系统服务状态均正常，但通知中心
+  没有记录，推测是通知插件与该预览版的兼容问题；Windows 10/11 稳定版可能不受影响。
+- 国产 Android ROM 的杀后台、自启动白名单和省电限制仍需更多真机覆盖。
 
 ## 后续路线
 
-- **Phase 2（Android）**：装 JDK 17 + Android SDK；桌面小组件用 `home_widget` +
-  Kotlin `GlanceAppWidgetReceiver`；提醒用 `zonedSchedule` + `exactAllowWhileIdle`，
-  需要引导国产 ROM 加自启动白名单（这是这类 App 提醒失效的头号原因）。
-  注意 `platform/notifications.dart` 里目前用 UTC 表示提醒时刻（Windows 只看绝对时间戳），
-  接 Android 时要换成真正的本地时区。
 - **Phase 3（教务系统直连）**：内嵌 WebView 登录 + 注入小爱课程表兼容的
   `scheduleHtmlProvider` / `scheduleHtmlParser`，产出的 `courseInfos` 直接走
   `core/import/course_info_dto.dart` 这条已经建好的通路，社区 `.js` 解析器可由用户粘贴导入。
-
