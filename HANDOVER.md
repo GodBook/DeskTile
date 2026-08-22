@@ -516,15 +516,18 @@ Windows 侧两个细节：
 | CSES 导出正确性 | 导出后用官方 `cses.schema.json`（draft-07）+ `jsonschema` 校验 | PASS；`docs/示例课表.cses.yaml` 也 PASS |
 | CSES 往返 | `cses_test.dart` | 导出再导入，星期/周次/节次数量一致 |
 
-**未能实测的两项**：
+**已知缺陷 1 项**：
 
-1. **Windows Toast 的视觉弹出**。排定和系统接收都验证了，也做过一轮「造一节 4 分钟后
-   开始的课 + 提前 3 分钟 → 围绕触发时刻连拍右下角」的尝试，但当时桌面有全屏程序在前台，
-   Windows 会自动抑制通知，所以没截到弹窗。
-   **接手后请在设置页点一下「10 秒后测试提醒」自行确认**（非全屏状态下）。
-   如果不弹，排查顺序见 §12。
-2. **选文件的原生对话框**（`FilePicker.pickFile`）。它后面的解析 → 预览 → 覆盖落盘
-   全链路有测试覆盖（`showImportPreview` 就是为此特意公开出来的），只有弹窗本身没测。
+**Windows Toast 在 Windows 11 26200 上弹窗失效** — 2026-08-22 完整排查结果：
+- 应用层正确：`scheduleTest()` 返回 true，`pendingCount` 正确递增，AUMID 已注册（`HKCU\...\AppUserModelId\DeskTile.KeBiaoDao.Desktop` 下 DisplayName / IconUri / CustomActivator 都在）
+- 系统层正常：通知主开关已开（`ToastEnabled=1`），应用通知权限已开，焦点助手未启用，`WpnService` / `WpnUserService` 都在运行
+- **但通知到时间后不弹出，通知中心（Win+N）也无历史记录**
+- 推测原因：flutter_local_notifications_windows 3.1.1 与 Windows 11 Insider 预览版 26200 的兼容性问题，或 COM 激活器（CLSID `{4d1b2f80-...}`）注册不完整
+- **其他 Windows 10/11 稳定版用户可能不受影响**；如需修复，考虑降级插件到 17.x 或换用 win_toast
+
+**未能实测的 1 项**（不影响交付）：
+
+**选文件的原生对话框**（`FilePicker.pickFile`）。它后面的解析 → 预览 → 覆盖落盘全链路有测试覆盖（`showImportPreview` 就是为此特意公开出来的），只有弹窗本身没截图。
 
 ---
 
@@ -655,7 +658,7 @@ GitHub 上有大量按这个约定写好的各校解析器（正方新旧版、�
 | CMake 报错改完还是同样的错 | CMake 会缓存失败结果，`rm -rf build` 再来 |
 | 测试挂死 10 分钟后超时、无错误信息 | `testWidgets` 里做了真实 IO 没包 `runAsync`。见 §7.2 ① |
 | 测试报 `RenderFlex overflowed` 但真机正常 | 测试字体行高差异。见 §7.2 ② |
-| 提醒不弹 | ①检查是不是全屏程序在前台（Windows 会抑制通知）②系统设置里「通知」总开关和本应用开关 ③焦点助手 ④设置页点「10 秒后测试提醒」看日志里的 `lastError` ⑤确认挂件进程在跑 |
+| **提醒不弹** | **① 先在设置页点「10 秒后测试提醒」，观察按钮下方有没有闪过 SnackBar 提示** ② 如果没有提示或提示里有错误，看日志里的 `lastError` ③ 系统设置里「通知」总开关和本应用开关是否都开 ④ 焦点助手是否启用（Win+A 快捷中心右下角） ⑤ `Get-Service WpnService` 是否 Running ⑥ 如果上述都正常但仍不弹，已知 Windows 11 26200 上 flutter_local_notifications_windows 3.1.1 有兼容性问题（见 §8 已知缺陷），考虑降级插件或换用 win_toast |
 | 挂件看不见 | 它是 `alwaysOnBottom`，被其它窗口盖住了。点托盘图标会 `show()`；或者在设置里关掉「贴在桌面上」改成置顶 |
 | 挂件位置乱了 | 删掉数据目录里的 `widget_pos.json`，下次启动回到主屏右下角 |
 | 双击图标没反应 | 单实例机制：已有同模式实例在跑，它会把已有窗口叫到前面。挂件被隐藏时表现为「没反应」，点托盘图标即可 |
