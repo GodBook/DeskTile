@@ -1,0 +1,43 @@
+version: 2
+configuration:
+  name: "CSES 导入测试"
+  description: "两周循环：周一每周都有，周二只有单周"
+  cycle:
+    work_count: 10
+    rest_count: 4
+    spans:
+      - activity: work
+        count: 5
+      - activity: rest
+        count: 2
+      - activity: work
+        count: 5
+      - activity: rest
+        count: 2
+subjects:
+  - name: "数学"
+    simplified_name: "数"
+    teacher: "李梅"
+    location: "101"
+  - name: "语文"
+    simplified_name: "语"
+    location: "102"
+schedules:
+  - name: "周一"
+    enable_day:
+      - 1
+      - 6
+    classes:
+      - subject: "数学"
+        start_time: "08:00:00"
+        end_time: "08:40:00"
+      - subject: "语文"
+        start_time: "08:50:00"
+        end_time: "09:30:00"
+  - name: "周二-单周"
+    enable_day:
+      - 2
+    classes:
+      - subject: "数学"
+        start_time: "08:00:00"
+        end_time: "08:40:00"
