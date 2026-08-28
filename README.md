@@ -2,8 +2,8 @@
 
 跨 Windows 与 Android 的极简课程表。无广告、无账号、纯本地，冷启动即用。
 
-**当前版本：v1.1.0**。Windows 桌面挂件与 Android 手机界面、Glance 主屏小组件、
-精准课程提醒均已完成；131 个跨平台测试通过。
+**当前版本：v1.1.1**。Windows 桌面挂件与 Android 手机界面、Glance 主屏小组件、
+精准课程提醒均已完成；141 个跨平台测试通过。
 
 > 接手开发请先读 **[HANDOVER.md](HANDOVER.md)** —— 环境坑、架构决策、文件职责、
 > 验证记录、Phase 2/3 落地步骤和排错手册都在那里。本文件只是使用向导。
@@ -12,11 +12,11 @@
 
 ## 下载
 
-前往 [v1.1.0 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.1.0)：
+前往 [v1.1.1 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.1.1)：
 
-- `DeskTile-v1.1.0-windows-x64.zip`：Windows 10/11 x64 免安装版，完整解压后运行
-- `DeskTile-v1.1.0-android.apk`：Android 安装包
-- `DeskTile-v1.1.0-android.aab`：应用商店上传包，不能直接安装
+- `DeskTile-v1.1.1-android.apk`：Android 安装包
+- `DeskTile-v1.1.1-android.aab`：应用商店上传包，不能直接安装
+- `DeskTile-v1.1.1-SHA256SUMS.txt`：安装包 SHA-256 校验值
 
 ## 已实现（Windows）
 
@@ -35,12 +35,25 @@
 
 ## 已实现（Android）
 
-- **手机界面**：底部四栏导航、系统安全区适配、横向课表与 320px 窄屏编辑器
+- **手机界面**：底部四栏导航、系统安全区适配、课表双指缩放与平移、320px 窄屏编辑器
 - **主屏小组件**：Jetpack Glance 展示周次、下一节、教室、今日剩余和最近考试
 - **即时刷新**：课程保存后约 300ms 更新小组件，后台每 30 分钟刷新
 - **精准提醒**：设备 IANA 时区、精准闹钟、锁屏待机调度，通知正文包含教室
 - **系统恢复**：重启后恢复通知计划、WorkManager 周期任务和 Glance 实例
 - **后台引导**：设置页可直达应用详情，便于国产 ROM 配置自启动和省电白名单
+- **线上更新**：设置 → 应用更新可检查 GitHub Release，下载 Android APK 后调用系统安装器原地升级，课表数据不会丢失
+
+应用内更新要求新 APK 与当前安装包使用相同的 `applicationId`（`com.desktile.desktile`）和
+发布签名密钥，并且 Release 中包含 `.apk` 资产（推荐命名为
+`DeskTile-v<版本>-android.apk`）。如果更新源不是本仓库，可在构建时传入
+`--dart-define=DESKTILE_UPDATE_URL=https://你的更新服务地址`；服务返回 GitHub Release
+格式的 JSON，或至少包含 `version`/`tag_name` 与 `apk_url`/`download_url`。首次安装更新时，
+Android 可能要求在系统设置中允许 DeskTile 安装未知应用，授权后回到设置页继续安装即可。
+当前仓库已公开，默认 GitHub 更新接口可直接对安装用户提供服务；如果改用私有仓库，
+请改用无需登录的更新服务或静态镜像。
+这条链路面向 GitHub/APK 直装分发；若以后只通过 Google Play 发布，应改用 Play 的应用内更新接口，
+不要继续依赖“未知来源安装”权限。
+`v1.1.1` 已包含课表双指缩放和应用内更新功能；后续版本沿用同一更新链路。
 
 ## 运行与构建
 
@@ -85,6 +98,28 @@ $env:GRADLE_USER_HOME='C:\Users\awxds\.gradle-desktile'
 D:\dev\flutter\bin\flutter.bat build apk --release
 D:\dev\flutter\bin\flutter.bat build appbundle --release
 ```
+
+### Android 自动发布
+
+仓库中的 `.github/workflows/android-release.yml` 会在推送匹配 `v*` 的 Git 标签时自动运行：
+先校验标签与 `pubspec.yaml` 版本一致，再执行测试、签名构建并创建/更新 GitHub Release。
+
+首次使用前，在仓库 Settings → Secrets and variables → Actions 中配置以下 Secrets：
+
+- `ANDROID_KEYSTORE_BASE64`：`android/keystore/desktile-release.jks` 的 Base64 内容
+- `ANDROID_KEYSTORE_PASSWORD`：keystore 口令
+- `ANDROID_KEY_ALIAS`：密钥别名（当前为 `desktile`）
+- `ANDROID_KEY_PASSWORD`：密钥口令
+
+以后发布只需递增 `pubspec.yaml` 的 `version`（例如 `1.1.2+4`），提交后执行：
+
+```powershell
+git tag v1.1.2
+git push origin master
+git push origin v1.1.2
+```
+
+工作流会上传 APK、AAB 和校验文件；Android 客户端会从最新 Release 检查到新 APK。
 
 ## 数据
 
@@ -132,7 +167,7 @@ tool/
 
 已实测通过：
 
-- `flutter analyze` 无任何问题；`flutter test` 131 个测试全绿
+- `flutter analyze` 无任何问题；`flutter test` 141 个测试全绿
 - Release 构建成功，主窗口与挂件都实际运行并截图确认
 - Android 正式签名 APK/AAB 构建成功；API 36 模拟器完成通知、小组件、重启恢复验收
 - 单双周：第 1 周显示单周课、第 2 周显示双周课，界面测试与真机截图双向确认

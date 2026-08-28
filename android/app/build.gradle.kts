@@ -85,6 +85,8 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // 应用内 APK 更新通过 AndroidX FileProvider 共享缓存中的安装包。
+    implementation("androidx.core:core:1.13.1")
     // home_widget 0.9.3 brings this transitively, but declaring it here keeps
     // the app's Glance source independent of a plugin implementation detail.
     implementation("androidx.glance:glance-appwidget:1.1.1")

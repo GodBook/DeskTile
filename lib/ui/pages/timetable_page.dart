@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../core/agenda.dart';
@@ -211,6 +213,51 @@ class _Grid extends StatelessWidget {
             (constraints.maxWidth - _timeColumnWidth) / dayCount;
         final colWidth = availableColWidth < 96 ? 96.0 : availableColWidth;
         final gridWidth = _timeColumnWidth + colWidth * dayCount;
+
+        // Android 上把完整网格交给 InteractiveViewer，双指可以缩放，单指
+        // 可以平移；桌面端保留原来的横向/纵向滚动和固定表头行为。
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          return InteractiveViewer(
+            key: const ValueKey('timetable-zoom-view'),
+            alignment: Alignment.topLeft,
+            boundaryMargin: const EdgeInsets.all(24),
+            constrained: false,
+            minScale: 0.65,
+            maxScale: 2.5,
+            child: SizedBox(
+              width: gridWidth,
+              height: _headerHeight + _rowHeight * maxSection,
+              child: Column(
+                children: [
+                  _HeaderRow(
+                    timetable: t,
+                    week: week,
+                    dayCount: dayCount,
+                    colWidth: colWidth,
+                    todayDay: today?.week == week ? today?.day : null,
+                  ),
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _TimeColumn(timetable: t, maxSection: maxSection),
+                        for (var day = 1; day <= dayCount; day++)
+                          _DayColumn(
+                            timetable: t,
+                            week: week,
+                            day: day,
+                            width: colWidth,
+                            maxSection: maxSection,
+                            isToday: today?.week == week && today?.day == day,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
 
         // 表头和内容放在同一个水平视口中，两者始终使用同一滚动偏移。
         return SingleChildScrollView(

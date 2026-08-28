@@ -16,6 +16,7 @@ import 'package:desktile/ui/pages/exams_page.dart';
 import 'package:desktile/ui/pages/import_export_page.dart';
 import 'package:desktile/ui/pages/timetable_page.dart';
 import 'package:desktile/ui/widget_app.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -43,7 +44,10 @@ Future<AppState> _makeState(
     // 再补一节「今天」的课，让挂件的今日列表不依赖测试当天是星期几。
     final base = buildTestTimetable(termStart: mondayOf(DateTime.now()));
     final withToday = base.copyWith(
-      courses: [...base.courses, const Course(id: 'c_today', name: '今天的课')],
+      courses: [
+        ...base.courses,
+        const Course(id: 'c_today', name: '今天的课'),
+      ],
       sessions: [
         ...base.sessions,
         CourseSession(
@@ -57,12 +61,14 @@ Future<AppState> _makeState(
         ),
       ],
     );
-    await store.save(AppData(
-      timetables: [withToday],
-      activeTimetableId: 't1',
-      exams: exams,
-      settings: settings,
-    ));
+    await store.save(
+      AppData(
+        timetables: [withToday],
+        activeTimetableId: 't1',
+        exams: exams,
+        settings: settings,
+      ),
+    );
     state = AppState(store: store);
     await state.load();
   });
@@ -70,9 +76,9 @@ Future<AppState> _makeState(
 }
 
 Widget _host(AppState state, Widget child) => AppScope(
-      state: state,
-      child: MaterialApp(home: Scaffold(body: child)),
-    );
+  state: state,
+  child: MaterialApp(home: Scaffold(body: child)),
+);
 
 void main() {
   test('Android 通知小图标资源配置完整', () {
@@ -160,6 +166,40 @@ void main() {
     expect(find.text('教三-305'), findsOneWidget);
   });
 
+  testWidgets('Android 周视图支持双指缩放网格', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.padding = const FakeViewPadding(top: 24);
+      addTearDown(tester.view.reset);
+
+      final state = await _makeState(tester);
+      await tester.pumpWidget(_host(state, const TimetablePage()));
+      await tester.pumpAndSettle();
+
+      final zoomView = find.byKey(const ValueKey('timetable-zoom-view'));
+      expect(zoomView, findsOneWidget);
+      final viewer = tester.widget<InteractiveViewer>(zoomView);
+      expect(viewer.minScale, lessThan(1));
+      expect(viewer.maxScale, greaterThan(1));
+
+      final firstFinger = await tester.startGesture(const Offset(130, 350));
+      final secondFinger = await tester.startGesture(const Offset(230, 350));
+      await tester.pump();
+      await firstFinger.moveBy(const Offset(-24, 0));
+      await secondFinger.moveBy(const Offset(24, 0));
+      await tester.pump();
+      await firstFinger.up();
+      await secondFinger.up();
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('周视图：单周课在第 1 周出现、第 2 周消失', (tester) async {
     final state = await _makeState(tester);
     await tester.pumpWidget(_host(state, const TimetablePage()));
@@ -177,20 +217,25 @@ void main() {
   });
 
   testWidgets('考试页：列出倒计时、考场和座位，考完的折叠起来', (tester) async {
-    final state = await _makeState(tester, exams: [
-      Exam(
-        id: 'e1',
-        name: '高等数学 期末',
-        startAt: DateTime.now().add(const Duration(days: 12, hours: 3, minutes: 1)),
-        room: '教三-305',
-        seat: '18',
-      ),
-      Exam(
-        id: 'e2',
-        name: '已经考完的',
-        startAt: DateTime.now().subtract(const Duration(days: 3)),
-      ),
-    ]);
+    final state = await _makeState(
+      tester,
+      exams: [
+        Exam(
+          id: 'e1',
+          name: '高等数学 期末',
+          startAt: DateTime.now().add(
+            const Duration(days: 12, hours: 3, minutes: 1),
+          ),
+          room: '教三-305',
+          seat: '18',
+        ),
+        Exam(
+          id: 'e2',
+          name: '已经考完的',
+          startAt: DateTime.now().subtract(const Duration(days: 3)),
+        ),
+      ],
+    );
     await tester.pumpWidget(_host(state, const ExamsPage()));
     await tester.pumpAndSettle();
 
@@ -203,17 +248,19 @@ void main() {
   });
 
   testWidgets('挂件：显示周次、下一节（含教室）和最近考试倒计时', (tester) async {
-    final state = await _makeState(tester, exams: [
-      Exam(
-        id: 'e1',
-        name: '线性代数 期末',
-        startAt: DateTime.now().add(const Duration(days: 5)),
-      ),
-    ]);
-    await tester.pumpWidget(WidgetApp(
-      state: state,
-      positionStore: WidgetPositionStore(state.store),
-    ));
+    final state = await _makeState(
+      tester,
+      exams: [
+        Exam(
+          id: 'e1',
+          name: '线性代数 期末',
+          startAt: DateTime.now().add(const Duration(days: 5)),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      WidgetApp(state: state, positionStore: WidgetPositionStore(state.store)),
+    );
     await tester.pumpAndSettle();
 
     expect(find.textContaining('第 1 周 · '), findsOneWidget);
@@ -227,10 +274,9 @@ void main() {
       tester,
       settings: const AppSettings(widgetForm: WidgetForm.mini),
     );
-    await tester.pumpWidget(WidgetApp(
-      state: state,
-      positionStore: WidgetPositionStore(state.store),
-    ));
+    await tester.pumpWidget(
+      WidgetApp(state: state, positionStore: WidgetPositionStore(state.store)),
+    );
     await tester.pumpAndSettle();
 
     expect(find.textContaining('第 1 周 · '), findsOneWidget);
@@ -245,20 +291,22 @@ void main() {
       imported = importCsv(csv, totalWeeks: 16);
     });
 
-    await tester.pumpWidget(_host(
-      state,
-      Builder(
-        builder: (context) => TextButton(
-          onPressed: () => showImportPreview(
-            context,
-            fileName: '示例课表.csv',
-            imported: imported,
-            base: state.activeTimetable!,
+    await tester.pumpWidget(
+      _host(
+        state,
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showImportPreview(
+              context,
+              fileName: '示例课表.csv',
+              imported: imported,
+              base: state.activeTimetable!,
+            ),
+            child: const Text('打开导入预览'),
           ),
-          child: const Text('打开导入预览'),
         ),
       ),
-    ));
+    );
     await tester.tap(find.text('打开导入预览'));
     await tester.pumpAndSettle();
 
@@ -268,7 +316,9 @@ void main() {
 
     await tester.tap(find.text('导入并覆盖'));
     // putTimetable 要写盘，交给 runAsync 真正跑完
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
     await tester.pumpAndSettle();
 
     final t = state.activeTimetable!;

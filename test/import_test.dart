@@ -8,6 +8,8 @@ import 'package:desktile/core/import/json_importer.dart';
 import 'package:desktile/core/week_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'helpers.dart';
+
 String _fixture(String name) =>
     utf8.decode(File('docs/$name').readAsBytesSync());
 
@@ -146,6 +148,55 @@ void main() {
     test('空的 courseInfos 报错', () {
       expect(() => importCourseInfosJson('{"courseInfos":[]}'),
           throwsFormatException);
+    });
+
+    test('能导入本程序导出的完整备份，并选择活动课表', () {
+      final active = buildTestTimetable(totalWeeks: 16);
+      final inactive = Map<String, dynamic>.from(active.toJson())
+        ..['id'] = 'inactive'
+        ..['name'] = '不应导入';
+      final backup = jsonEncode({
+        'schemaVersion': 1,
+        'activeTimetableId': active.id,
+        'timetables': [inactive, active.toJson()],
+        'exams': const [],
+        'settings': const {},
+      });
+
+      final imported = importCourseInfosJson(backup, totalWeeks: 20);
+
+      expect(imported.name, active.name);
+      expect(imported.termStart, testTermStart);
+      expect(imported.totalWeeks, 16);
+      expect(imported.courses.length, 4);
+      expect(imported.timeSlots, isNotNull);
+      expect(imported.timeSlots!.length, 12);
+      final math = imported.courses.firstWhere((c) => c.name == '高等数学');
+      expect(math.teacher, '张伟');
+      expect(math.position, '教三-305');
+      expect(math.sections, [1, 2]);
+    });
+
+    test('带 UTF-8 BOM 的备份也能导入', () {
+      final source = buildTestTimetable(totalWeeks: 16).toJson();
+      final backup = jsonEncode({
+        'activeTimetableId': source['id'],
+        'timetables': [source],
+      });
+
+      final imported = importCourseInfosJson('\uFEFF$backup');
+
+      expect(imported.courses, isNotEmpty);
+    });
+
+    test('直接导出的单张课表 JSON 也能导入', () {
+      final source = buildTestTimetable(totalWeeks: 16).toJson();
+
+      final imported = importCourseInfosJson(jsonEncode(source));
+
+      expect(imported.name, '测试课表');
+      expect(imported.totalWeeks, 16);
+      expect(imported.courses.length, 4);
     });
   });
 

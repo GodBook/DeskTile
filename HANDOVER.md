@@ -1,21 +1,21 @@
 # DeskTile 课表岛 — 项目交接文档
 
-> 最后更新：2026-08-22 · 当前状态：Phase 1（Windows）完成 + Phase 2（Android）完成
+> 最后更新：2026-08-28 · 当前状态：Phase 1（Windows）完成 + Phase 2（Android）完成
 > 代码位置：`D:\CLAUDE\DeskTile`（原中文目录 `D:\CLAUDE\DeskTile课表岛` 未使用，见 §1.2）
-> 仓库：https://github.com/GodBook/DeskTile （私有）· 当前发布：`v1.1.0`（Windows x64 + Android APK/AAB）
-> 规模：`lib/` 41 个文件 6258 行，`test/` 13 个文件 1563 行 / 131 个用例
+> 仓库：https://github.com/GodBook/DeskTile （公开）· 当前发布：`v1.1.1`（Android APK/AAB）
+> 规模：`lib/` 42 个文件，`test/` 14 个文件 / 141 个用例
 
 ---
 
 ## 0. 现状一句话
 
-**Windows 端**功能完整、Release 构建通过、131 个跨平台测试全绿、实机跑过并截图，已打包发布到 GitHub Release；
+**Windows 端**功能完整、Release 构建通过、141 个跨平台测试全绿、实机跑过并截图，已打包发布到 GitHub Release；
 唯一已知缺陷是 Toast 弹窗在本机 Windows 11 26200 上不显示（排定逻辑正确，见 §8）。
 
 **Android 端 Phase 2 已完成**：单 Activity 手机界面、Jetpack Glance 主屏小组件、
 30 分钟后台刷新、IANA 本地时区精准提醒、每日重排和开机恢复均已落地。
 API 36 模拟器已验证小组件即时刷新、10 秒通知、精准闹钟、重启恢复和原生应用详情入口；
-`v1.1.0` Release 提供正式签名 APK、AAB 和 Windows x64 免安装包。
+`v1.1.1` Release 提供正式签名 APK、AAB 和校验文件；Windows 资产沿用 `v1.1.0` Release。
 
 **下次接手的第一件事**：继续做 §10.5 的国产 ROM 真机后台可靠性验证并确定
 Play App Signing；若继续产品功能，则进入 §11 的教务系统直连。
@@ -29,8 +29,8 @@ Play App Signing；若继续产品功能，则进入 §11 的教务系统直连�
 | git 仓库 | 已建（`master` 分支，已配置 GitHub 远端） |
 | 远端 | `git@github.com:GodBook/DeskTile.git`（**SSH，不是 HTTPS**，原因见下） |
 | 提交身份 | 仓库级占位身份 `DeskTile Dev <dev@localhost>`，**全局 git config 未被改动** |
-| 标签 | `v1.0.0`（Windows 首发）、`v1.1.0`（Android Phase 2） |
-| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.1.0 · Windows x64、Android APK 与 AAB |
+| 标签 | `v1.0.0`（Windows 首发）、`v1.1.0`（Android Phase 2）、`v1.1.1`（线上更新与课表缩放） |
+| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.1.1 · Android APK、AAB 与校验文件 |
 
 **为什么 remote 是 SSH**：本机 `github.com:443` 被墙（20 秒超时），
 但 `github.com:22` 和 `ssh.github.com:443` 都通，`~/.ssh/id_ed25519` 也早就绑好了
@@ -131,7 +131,7 @@ repositories 策略冲突。DeskTile 已验证可用的隔离目录是
 
 ```bash
 tool/flutter-msvc.bat analyze                  # 静态检查，目前 0 问题
-tool/flutter-msvc.bat test                     # 全部 131 个测试
+tool/flutter-msvc.bat test                     # 全部 141 个测试
 tool/flutter-msvc.bat test test/ui_test.dart   # 只跑界面测试
 tool/flutter-msvc.bat run -d windows           # 调试运行（主窗口模式）
 tool/flutter-msvc.bat build windows --release  # 出包
@@ -212,12 +212,13 @@ Android 依赖方面，`maven.google.com` 在本机仍会超时，但 `google()`
 
 ### 2.2 已实现（Android）
 
-- **手机界面**：底部四栏导航、状态栏/手势区 `SafeArea`、横向课表滚动、320px 窄屏课程编辑器
+- **手机界面**：底部四栏导航、状态栏/手势区 `SafeArea`、课表双指缩放与平移、320px 窄屏课程编辑器
 - **主屏小组件**：Glance 展示周次、下一节、教室、今日剩余和最近考试；支持从应用请求固定到主屏
 - **数据刷新**：课表保存后约 300ms 内刷新小组件，前台每分钟刷新倒计时，后台每 30 分钟刷新
 - **课程提醒**：设备 IANA 时区 + `exactAllowWhileIdle`，每天本地 00:05 重排未来 7 天
 - **系统恢复**：通知插件 receiver 恢复开机前闹钟，WorkManager 与 Glance 实例在重启后保留
 - **权限与引导**：只在用户明确开启/重排/测试提醒时请求权限；设置页可打开系统应用详情
+- **应用内更新**：设置页可查询 GitHub Release、流式下载 APK，并通过 `FileProvider` 调起系统安装器原地升级
 - **跨端数据**：沿用备份 JSON 导入导出，无需新增 Android 专用数据格式
 
 ### 2.3 明确不做（当时和需求方确认过的）
@@ -232,7 +233,7 @@ Android 依赖方面，`maven.google.com` 在本机仍会超时，但 `google()`
 | 教务系统直连（登录 + 抓课表） | Phase 3，见 §11。解析通路已预留 |
 | 多张课表切换 | 数据结构支持（`timetables` 是数组、有 `activeTimetableId`），界面没做入口 |
 | 课程冲突提示 | `CourseSession.overlaps()` 已实现且可用，界面没接 |
-| Android 发布准备 | `v1.1.0` 正式 APK/AAB 已发布；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
+| Android 发布准备 | `v1.1.1` 正式 APK/AAB 已发布；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
 
 ---
 
@@ -367,6 +368,7 @@ Flutter Windows 的透明窗口有已知的发黑问题。现在的做法是
 | `android_widget.dart` | 65 | Dart → HomeWidget 桥：保存 payload、触发 Glance 更新、请求固定到主屏 |
 | `android_background.dart` | 91 | WorkManager dispatcher；30 分钟小组件刷新、每日 00:05 提醒重排、旧 v1 任务迁移 |
 | `android_system_settings.dart` | 21 | MethodChannel 打开当前应用的 Android 系统详情页 |
+| `android_update.dart` | 531 | GitHub Release 更新检查、版本比较、APK 流式下载与系统安装器桥接 |
 
 ### `lib/ui/`
 
@@ -374,11 +376,11 @@ Flutter Windows 的透明窗口有已知的发黑问题。现在的做法是
 |---|---|---|
 | `theme.dart` | 57 | M3 主题、10 色课程配色板、`courseColor(seed)`、日期/时刻格式化 |
 | `app.dart` | 139 | 主界面壳：宽屏 `NavigationRail`，手机底部 `NavigationBar`，内容统一避开系统安全区 |
-| `pages/timetable_page.dart` | 527 | 响应式周视图：手机可横向滚动；课程块按可用高度决定显示到教室还是教师 |
+| `pages/timetable_page.dart` | 573 | 响应式周视图：Android 支持双指缩放/平移，桌面保留滚动；课程块按可用高度决定显示到教室还是教师 |
 | `pages/session_editor.dart` | 365 | 课程时段编辑弹窗；320px 窄屏字段纵向重排；保存时复用 Course 并清理孤儿课程 |
 | `pages/exams_page.dart` | 321 | 考试列表 + 编辑弹窗 |
 | `pages/import_export_page.dart` | 442 | 格式说明、选文件导入、`showImportPreview()`（公开出来是为了能测）、三个导出动作 |
-| `pages/settings_page.dart` | 602 | 学期 / 节次 / 提醒 / Android 后台可靠性与主屏小组件 / 桌面挂件 / 外观设置 |
+| `pages/settings_page.dart` | 838 | 学期 / 节次 / 提醒 / Android 后台可靠性、主屏小组件、应用更新 / 桌面挂件 / 外观设置 |
 | `widget_app.dart` | 380 | 挂件：`_WidgetSurface`（拖动 + 位置保存 + 20s 刷新计时器）、`_Header`、`_NextUp`、`_TodayList`、`_ExamLine` |
 | `main.dart` | 202 | Android/Windows 启动分流；Android 状态同步；Windows 两种进程与每日重排 |
 
@@ -557,7 +559,7 @@ Glance 实例和共享 payload 均能跨重启保留；新安装但尚无 payloa
 
 ## 7. 测试
 
-### 7.1 清单（131 个用例）
+### 7.1 清单（141 个用例）
 
 | 文件 | 用例 | 覆盖什么 |
 |---|---|---|
@@ -566,13 +568,14 @@ Glance 实例和共享 payload 均能跨重启保留；新安装但尚无 payloa
 | `agenda_test.dart` | 12 | 某周某天的课与排序、单周课只在奇数周、上课中/课间/跨天找下一节、今日剩余、学期外 |
 | `reminder_plan_test.dart` | 12 | 早八只取第一节、正文含教室、第一节太晚不提醒、阈值拉到 24:00、过去时刻不排、单周课第 2 周无提醒、整周排序、关开关、每节课模式、通知 id 决定性与 32 位范围 |
 | `exam_countdown_test.dart` | 15 | 排序与过滤、正在考、`examEndAt` 默认 2 小时、`formatRemaining` 各档 |
-| `import_test.dart` | 17 | CSV（9 行全过、中英文星期、单双周、节次区间、部分周次、装配后同名课合并、缺列报错、坏行进警告）、JSON（两种 sections 写法、sectionTimes、裸数组、DTO 往返）、ICS（学期起点推算、多次事件归并、节次推算） |
+| `import_test.dart` | 20 | CSV（9 行全过、中英文星期、单双周、节次区间、部分周次、装配后同名课合并、缺列报错、坏行进警告）、JSON（两种 sections 写法、sectionTimes、裸数组、DTO 往返）、ICS（学期起点推算、多次事件归并、节次推算） |
 | `cses_test.dart` | 13 | CSES 导入（配置名、节次推算、两循环周合并成每周、单周、非整数周报错、3 周循环报错）+ 导出（两周循环、单双周分表、subjects 带教师教室、**导出再导入一致**、无法表达的跳过、周日拒绝导出） |
 | `store_test.dart` | 7 | 首次运行初始数据、存取往返不丢、不留 `.tmp`、损坏备份兜底、顶层非对象兜底、`schemaVersion`、`newId` 不重复 |
-| `ui_test.dart` | 10 | 原有周视图/单双周/考试/挂件/导入覆盖，加手机 SafeArea + 底部导航、宽屏侧栏、320px 编辑器和 Android 通知图标资源回归 |
+| `ui_test.dart` | 11 | 原有周视图/单双周/考试/挂件/导入覆盖，加手机 SafeArea + 底部导航、Android 双指缩放、宽屏侧栏、320px 编辑器和通知图标资源回归 |
 | `widget_payload_test.dart` | 2 | Android 小组件 payload 的课表/考试装配、学期外兜底和 JSON 往返 |
 | `android_background_test.dart` | 3 | 本地 00:05 前后边界，以及午夜前的次日延迟计算 |
 | `reminder_permission_policy_test.dart` | 5 | Android 权限只在开启提醒或明确重新排定时请求，普通设置和非 Android 不请求 |
+| `android_update_test.dart` | 6 | 版本比较、Release APK 筛选、降级拦截、完整下载与 HTTPS 校验 |
 
 `docs/示例课表.csv` 和 `docs/示例课表.cses.yaml` 既是用户模板也是测试 fixture，
 改动它们会影响 `import_test` / `cses_test` 的断言。
@@ -601,7 +604,7 @@ Glance 实例和共享 payload 均能跨重启保留；新安装但尚无 payloa
 | 项 | 怎么验的 | 结果 |
 |---|---|---|
 | 静态检查 | `flutter analyze` | 0 问题（含 lint info） |
-| 单元/界面测试 | `tool\flutter-msvc.bat test` | 131/131 通过 |
+| 单元/界面测试 | `tool\flutter-msvc.bat test` | 141/141 通过 |
 | Windows Release | `tool\flutter-msvc.bat build windows --release` | 成功；进程 5 秒保持响应，实际加载 `flutter_timezone_plugin.dll` |
 | 主窗口渲染 | 灌示例数据后实机运行，`PrintWindow` 抓窗口 | 见 `docs/screenshots/主窗口-周视图.png` |
 | 挂件渲染 | 同上 | 见 `docs/screenshots/桌面挂件.png` |
@@ -615,7 +618,7 @@ Glance 实例和共享 payload 均能跨重启保留；新安装但尚无 payloa
 | Android Debug 构建 | 专用 `GRADLE_USER_HOME` + `flutter build apk --debug` | 成功，APK 约 180 MB，可覆盖安装到 API 36 模拟器 |
 | Android Release 签名 | `flutter build apk/appbundle --release` + `apksigner` / `jarsigner` | APK 54.5 MB、AAB 53.2 MB；RSA 4096，APK v2 通过，AAB `jar verified` |
 | 正式应用图标 | SVG 母版 + Android adaptive/monochrome/legacy + Windows ICO | 已替换 Flutter 默认图标；通知使用独立单色小图标 |
-| Android 手机布局 | Pixel 6 API 36 竖屏 + widget tests | 底部导航、安全区、横向课表、窄屏编辑器均无溢出；见 `docs/screenshots/Android-主界面.png` |
+| Android 手机布局 | Pixel 6 API 36 竖屏 + widget tests | 底部导航、安全区、课表双指缩放/平移、窄屏编辑器均无溢出；见 `docs/screenshots/Android-主界面.png` |
 | Glance 小组件 | Pixel Launcher 添加组件并修改课程 | Provider/实例正常；`RefreshTest / A101` 保存后约 300ms 即时更新，见 `Android-小组件*.png` |
 | Android 测试提醒 | 设置页“10 秒后测试提醒” + 通知中心 | 修复 `invalid_icon` 后通知成功发布；Release 资源表保留 `drawable/ic_notification`，见 `Android-10秒提醒-修复验证.png` |
 | 本地时区排定 | 读取插件缓存 | `scheduledDateTime=2026-08-24T07:30:00`，`timeZoneName=Asia/Shanghai` |
@@ -723,6 +726,9 @@ API 36 的 `DeskTile_API36` 已验证：
 
 - 至少在一台国产 ROM 真机验证通知权限、精准闹钟、锁屏待机、重启、自启动白名单与省电限制
 - 按 `android/签名说明.md` 将 keystore 与口令文件备份到至少两个加密位置
+- 发布新版本时必须递增 `pubspec.yaml` 的 version/build number、沿用同一签名密钥，并把通用 APK 上传到 Release；用户可在“设置 → 应用更新”原地升级
+- `.github/workflows/android-release.yml` 已配置为标签发布入口；首次需设置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD` 四个 Actions Secrets
+- 后续发布只需提交版本变更并推送对应的 `vX.Y.Z` 标签，工作流会自动测试、签名构建并上传 APK、AAB 与 SHA-256 文件
 - 首次上架时确定是否启用 Play App Signing；当前 RSA 4096 密钥可作为 upload key
 - 根据后续发布渠道决定是否拆分 ABI，以及是否缩减约 180 MB 的通用 Debug APK
 - 从 1024px 正式母版继续制作 Play 商店展示图、功能横幅和隐私政策页面
@@ -801,6 +807,3 @@ GitHub 上有大量按这个约定写好的各校解析器（正方新旧版、�
 - home_widget：https://pub.dev/packages/home_widget
 - workmanager：https://pub.dev/packages/workmanager
 - flutter_timezone：https://pub.dev/packages/flutter_timezone
-
-
-
