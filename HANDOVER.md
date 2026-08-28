@@ -2,7 +2,7 @@
 
 > 最后更新：2026-08-28 · 当前状态：Phase 1（Windows）完成 + Phase 2（Android）完成
 > 代码位置：`D:\CLAUDE\DeskTile`（原中文目录 `D:\CLAUDE\DeskTile课表岛` 未使用，见 §1.2）
-> 仓库：https://github.com/GodBook/DeskTile （公开）· 当前发布：`v1.1.1`（Android APK/AAB）
+> 仓库：https://github.com/GodBook/DeskTile （公开）· 当前发布：`v1.1.2`（Android APK/AAB）
 > 规模：`lib/` 42 个文件，`test/` 14 个文件 / 141 个用例
 
 ---
@@ -15,7 +15,7 @@
 **Android 端 Phase 2 已完成**：单 Activity 手机界面、Jetpack Glance 主屏小组件、
 30 分钟后台刷新、IANA 本地时区精准提醒、每日重排和开机恢复均已落地。
 API 36 模拟器已验证小组件即时刷新、10 秒通知、精准闹钟、重启恢复和原生应用详情入口；
-`v1.1.1` Release 提供正式签名 APK、AAB 和校验文件；Windows 资产沿用 `v1.1.0` Release。
+`v1.1.2` Release 提供正式签名 APK、AAB 和校验文件；Windows 资产沿用 `v1.1.0` Release。
 
 **下次接手的第一件事**：继续做 §10.5 的国产 ROM 真机后台可靠性验证并确定
 Play App Signing；若继续产品功能，则进入 §11 的教务系统直连。
@@ -29,8 +29,8 @@ Play App Signing；若继续产品功能，则进入 §11 的教务系统直连�
 | git 仓库 | 已建（`master` 分支，已配置 GitHub 远端） |
 | 远端 | `git@github.com:GodBook/DeskTile.git`（**SSH，不是 HTTPS**，原因见下） |
 | 提交身份 | 仓库级占位身份 `DeskTile Dev <dev@localhost>`，**全局 git config 未被改动** |
-| 标签 | `v1.0.0`（Windows 首发）、`v1.1.0`（Android Phase 2）、`v1.1.1`（线上更新与课表缩放） |
-| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.1.1 · Android APK、AAB 与校验文件 |
+| 标签 | `v1.0.0`（Windows 首发）、`v1.1.0`（Android Phase 2）、`v1.1.1`（线上更新与课表缩放）、`v1.1.2`（安装器兼容性修复） |
+| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.1.2 · Android APK、AAB 与校验文件 |
 
 **为什么 remote 是 SSH**：本机 `github.com:443` 被墙（20 秒超时），
 但 `github.com:22` 和 `ssh.github.com:443` 都通，`~/.ssh/id_ed25519` 也早就绑好了
@@ -233,7 +233,7 @@ Android 依赖方面，`maven.google.com` 在本机仍会超时，但 `google()`
 | 教务系统直连（登录 + 抓课表） | Phase 3，见 §11。解析通路已预留 |
 | 多张课表切换 | 数据结构支持（`timetables` 是数组、有 `activeTimetableId`），界面没做入口 |
 | 课程冲突提示 | `CourseSession.overlaps()` 已实现且可用，界面没接 |
-| Android 发布准备 | `v1.1.1` 正式 APK/AAB 已发布；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
+| Android 发布准备 | `v1.1.2` 正式 APK/AAB 已发布；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
 
 ---
 

@@ -14,7 +14,7 @@ const defaultAndroidUpdateUrl = String.fromEnvironment(
 );
 
 // 与 pubspec.yaml 保持同步，供测试环境或旧原生插件缺少版本通道时回退。
-const defaultAndroidVersion = '1.1.1';
+const defaultAndroidVersion = '1.1.2';
 
 const _updateChannel = MethodChannel('com.desktile.desktile/app_update');
 const _requestTimeout = Duration(seconds: 20);
@@ -272,7 +272,15 @@ class AndroidUpdateService {
         _ => throw const AndroidUpdateException('系统没有启动安装器'),
       };
     } on PlatformException catch (error) {
-      throw AndroidUpdateException(error.message ?? '系统安装器启动失败');
+      final message = switch (error.code) {
+        'INSTALLER_START_FAILED' =>
+          '系统没有可用的 APK 安装器，请尝试用文件管理器打开更新包',
+        'APK_URI_FAILED' => '无法读取更新文件，请重新下载',
+        'APK_NOT_FOUND' => '更新文件已失效，请重新下载',
+        'UNKNOWN_SOURCE_SETTINGS_FAILED' => '无法打开“安装未知应用”设置，请到系统设置中授权',
+        _ => error.message ?? '系统安装器启动失败',
+      };
+      throw AndroidUpdateException(message);
     } on MissingPluginException {
       throw const AndroidUpdateException('当前 Android 版本不支持应用内更新');
     }

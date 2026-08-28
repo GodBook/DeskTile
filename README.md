@@ -2,7 +2,7 @@
 
 跨 Windows 与 Android 的极简课程表。无广告、无账号、纯本地，冷启动即用。
 
-**当前版本：v1.1.1**。Windows 桌面挂件与 Android 手机界面、Glance 主屏小组件、
+**当前版本：v1.1.2**。Windows 桌面挂件与 Android 手机界面、Glance 主屏小组件、
 精准课程提醒均已完成；141 个跨平台测试通过。
 
 > 接手开发请先读 **[HANDOVER.md](HANDOVER.md)** —— 环境坑、架构决策、文件职责、
@@ -12,11 +12,11 @@
 
 ## 下载
 
-前往 [v1.1.1 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.1.1)：
+前往 [v1.1.2 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.1.2)：
 
-- `DeskTile-v1.1.1-android.apk`：Android 安装包
-- `DeskTile-v1.1.1-android.aab`：应用商店上传包，不能直接安装
-- `DeskTile-v1.1.1-SHA256SUMS.txt`：安装包 SHA-256 校验值
+- `DeskTile-v1.1.2-android.apk`：Android 安装包
+- `DeskTile-v1.1.2-android.aab`：应用商店上传包，不能直接安装
+- `DeskTile-v1.1.2-SHA256SUMS.txt`：安装包 SHA-256 校验值
 
 ## 已实现（Windows）
 
@@ -53,7 +53,8 @@ Android 可能要求在系统设置中允许 DeskTile 安装未知应用，授�
 请改用无需登录的更新服务或静态镜像。
 这条链路面向 GitHub/APK 直装分发；若以后只通过 Google Play 发布，应改用 Play 的应用内更新接口，
 不要继续依赖“未知来源安装”权限。
-`v1.1.1` 已包含课表双指缩放和应用内更新功能；后续版本沿用同一更新链路。
+`v1.1.2` 已包含课表双指缩放和应用内更新功能，并兼容未注册
+`ACTION_INSTALL_PACKAGE` 的 Android 系统；后续版本沿用同一更新链路。
 
 ## 运行与构建
 
@@ -111,12 +112,12 @@ D:\dev\flutter\bin\flutter.bat build appbundle --release
 - `ANDROID_KEY_ALIAS`：密钥别名（当前为 `desktile`）
 - `ANDROID_KEY_PASSWORD`：密钥口令
 
-以后发布只需递增 `pubspec.yaml` 的 `version`（例如 `1.1.2+4`），提交后执行：
+以后发布只需递增 `pubspec.yaml` 的 `version`（例如 `1.1.3+5`），提交后执行：
 
 ```powershell
-git tag v1.1.2
+git tag v1.1.3
 git push origin master
-git push origin v1.1.2
+git push origin v1.1.3
 ```
 
 工作流会上传 APK、AAB 和校验文件；Android 客户端会从最新 Release 检查到新 APK。

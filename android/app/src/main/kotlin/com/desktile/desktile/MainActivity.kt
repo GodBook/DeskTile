@@ -95,21 +95,44 @@ class MainActivity : FlutterActivity() {
       return
     }
 
-    runCatching {
-      val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
-      startActivity(
-          Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-            data = uri
-            type = "application/vnd.android.package-archive"
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            clipData = ClipData.newRawUri("DeskTile APK", uri)
-          },
-      )
-    }.onSuccess {
-      result.success("started")
-    }.onFailure { error ->
-      result.error("INSTALLER_START_FAILED", error.message, null)
+    val uri = runCatching {
+      FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
+    }.getOrElse { error ->
+      result.error("APK_URI_FAILED", "无法读取更新文件", error.message)
+      return
     }
+
+    // ACTION_INSTALL_PACKAGE 在部分国产 ROM 上没有公开的处理 Activity；
+    // ACTION_VIEW 是系统文件安装器普遍支持的兼容入口。
+    val intents = listOf(
+        Intent(Intent.ACTION_INSTALL_PACKAGE),
+        Intent(Intent.ACTION_VIEW),
+    ).map { intent ->
+      intent.apply {
+        data = uri
+        type = "application/vnd.android.package-archive"
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        clipData = ClipData.newRawUri("DeskTile APK", uri)
+      }
+    }
+
+    var lastError: Throwable? = null
+    for (intent in intents) {
+      try {
+        startActivity(intent)
+        result.success("started")
+        return
+      } catch (error: Exception) {
+        // 当前 ROM 不支持该 action 时继续尝试下一个兼容入口。
+        lastError = error
+      }
+    }
+
+    result.error(
+        "INSTALLER_START_FAILED",
+        "系统没有可用的 APK 安装器，请用文件管理器打开更新包",
+        lastError?.message,
+    )
   }
 }
