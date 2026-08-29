@@ -2,7 +2,7 @@
 
 > 最后更新：2026-08-29 · 当前状态：Phase 1（Windows）完成 + Phase 2（Android）完成
 > 代码位置：`D:\CLAUDE\DeskTile`（原中文目录 `D:\CLAUDE\DeskTile课表岛` 未使用，见 §1.2）
-> 仓库：https://github.com/GodBook/DeskTile （公开）· 当前发布：`v1.1.2`；源码版本：`v1.2.2`
+> 仓库：https://github.com/GodBook/DeskTile （公开）· 当前发布与源码版本：`v1.2.2`
 > 规模：`lib/` 50 个文件，`test/` 16 个文件 / 170 个用例
 
 ---
@@ -15,12 +15,11 @@
 **Android 端 Phase 2 已完成**：单 Activity 手机界面、Jetpack Glance 主屏小组件、
 30 分钟后台刷新、IANA 本地时区精准提醒、每日重排和开机恢复均已落地。
 API 36 模拟器已验证小组件即时刷新、10 秒通知、精准闹钟、重启恢复和原生应用详情入口；
-`v1.1.2` Release 提供正式签名 APK、AAB 和校验文件；源码 `v1.2.2` 已补齐 Windows
+`v1.2.2` Release 已提供正式签名 APK、AAB、Windows x64 Setup 和校验文件；本版补齐 Windows
 应用内更新、x64 Setup、自动发布、课表 `Ctrl + 滚轮` 缩放，以及双端共用的
-临时调课 / 停课 / 补课和作业待办，尚未推送标签发布。
+临时调课 / 停课 / 补课和作业待办。
 
-**下次接手的第一件事**：确认变更后推送 `v1.2.2` 标签，让双端发布工作流生成完整 Release；
-然后继续做 §10.5 的国产 ROM 真机后台可靠性验证并确定 Play App Signing。
+**下次接手的第一件事**：继续做 §10.5 的国产 ROM 真机后台可靠性验证并确定 Play App Signing。
 
 ---
 
@@ -31,9 +30,9 @@ API 36 模拟器已验证小组件即时刷新、10 秒通知、精准闹钟、�
 | git 仓库 | 已建（`master` 分支，已配置 GitHub 远端） |
 | 远端 | `git@github.com:GodBook/DeskTile.git`（**SSH，不是 HTTPS**，原因见下） |
 | 提交身份 | 仓库级占位身份 `DeskTile Dev <dev@localhost>`，**全局 git config 未被改动** |
-| 标签 | `v1.0.0`（Windows 首发）、`v1.1.0`（Android Phase 2）、`v1.1.1`（线上更新与课表缩放）、`v1.1.2`（安装器兼容性修复） |
-| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.1.2 · Android APK、AAB 与校验文件 |
-| 当前源码 | `1.2.2+7`；Windows 在线更新、Setup、课表缩放、双端临时课程变更和作业待办已完成，尚未创建 `v1.2.2` 标签 |
+| 标签 | `v1.0.0`（Windows 首发）、`v1.1.0`（Android Phase 2）、`v1.1.1`（线上更新与课表缩放）、`v1.1.2`（安装器兼容性修复）、`v1.2.2`（Windows 更新、临时课程变更、作业待办） |
+| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.2.2 · Android APK/AAB、Windows x64 Setup 与校验文件 |
+| 当前源码 | `1.2.2+7`；已创建 `v1.2.2` 标签，Android/Windows 发布工作流均成功 |
 
 版本规则：以后每新增一个独立功能，补丁版本加 1、构建号也加 1。例如下一项新功能从
 `1.2.2+7` 迭代到 `1.2.3+8`；修复版本按实际发布需要单独递增。
@@ -255,7 +254,7 @@ Android 依赖方面，`maven.google.com` 在本机仍会超时，但 `google()`
 | 教务系统直连（登录 + 抓课表） | Phase 3，见 §11。解析通路已预留 |
 | 多张课表切换 | 数据结构支持（`timetables` 是数组、有 `activeTimetableId`），界面没做入口 |
 | 常规课程冲突提示 | 临时调课 / 补课已提示冲突；常规重复课程编辑器尚未接冲突提示 |
-| Android 发布准备 | `v1.1.2` 正式 APK/AAB 已发布；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
+| Android 发布准备 | `v1.2.2` 正式 APK/AAB 已发布；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
 
 ---
 

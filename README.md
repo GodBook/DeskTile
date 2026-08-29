@@ -2,7 +2,7 @@
 
 跨 Windows 与 Android 的极简课程表。无广告、无账号、纯本地，冷启动即用。
 
-**当前开发版本：v1.2.2**（现行稳定版为 v1.1.2）。Windows 桌面挂件与 Android
+**当前稳定版本：v1.2.2**。Windows 桌面挂件与 Android
 手机界面、Glance 主屏小组件、精准课程提醒、双端线上更新及作业待办均已完成；170 个跨平台测试通过。
 
 > 接手开发请先读 **[HANDOVER.md](HANDOVER.md)** —— 环境坑、架构决策、文件职责、
@@ -12,14 +12,12 @@
 
 ## 下载
 
-当前稳定版前往 [v1.1.2 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.1.2)：
+当前稳定版前往 [v1.2.2 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.2.2)：
 
-- `DeskTile-v1.1.2-android.apk`：Android 安装包
-- `DeskTile-v1.1.2-android.aab`：应用商店上传包，不能直接安装
-- `DeskTile-v1.1.2-SHA256SUMS.txt`：安装包 SHA-256 校验值
-
-从 v1.2.1 起，同一 Release 还会提供
-`DeskTile-v<版本>-windows-x64-setup.exe` Windows 安装包及独立 SHA-256 文件。
+- `DeskTile-v1.2.2-android.apk`：Android 安装包
+- `DeskTile-v1.2.2-android.aab`：应用商店上传包，不能直接安装
+- `DeskTile-v1.2.2-windows-x64-setup.exe`：Windows x64 安装包
+- `DeskTile-v1.2.2-SHA256SUMS.txt`、`DeskTile-v1.2.2-windows-SHA256SUMS.txt`：安装包校验值
 
 ## 已实现（Windows）
 
