@@ -23,13 +23,17 @@ CsesExport exportCses(Timetable timetable) {
   if (timetable.sessions.isEmpty) {
     throw const FormatException('课表里没有课，没什么可导出的');
   }
+  if (timetable.scheduleChanges.isNotEmpty) {
+    warnings.add('临时调课、停课和补课无法用 CSES 表达，未写入导出文件；JSON 备份会完整保留');
+  }
 
   final all = allWeeks(timetable.totalWeeks);
   final odd = oddWeeks(timetable.totalWeeks);
   final even = evenWeeks(timetable.totalWeeks);
 
   // 归类每个时段的周次节奏。
-  final kept = <({int day, String name, int section, String? room, String rhythm})>[];
+  final kept =
+      <({int day, String name, int section, String? room, String rhythm})>[];
   for (final s in timetable.sessions) {
     final course = timetable.courseById(s.courseId);
     if (course == null) continue;
@@ -41,17 +45,27 @@ CsesExport exportCses(Timetable timetable) {
     } else if (setEquals(s.weeks, even)) {
       rhythm = 'even';
     } else {
-      warnings.add('「${course.name}」的周次是 '
-          '${formatWeeks(s.weeks, totalWeeks: timetable.totalWeeks)}，'
-          'CSES 只能表达每周/单周/双周，该时段已跳过');
+      warnings.add(
+        '「${course.name}」的周次是 '
+        '${formatWeeks(s.weeks, totalWeeks: timetable.totalWeeks)}，'
+        'CSES 只能表达每周/单周/双周，该时段已跳过',
+      );
       continue;
     }
     if (s.day == 7) {
-      throw const FormatException('课表里有周日的课，CSES 的工作日循环无法表达（'
-          'rest_count 至少为 2），无法导出');
+      throw const FormatException(
+        '课表里有周日的课，CSES 的工作日循环无法表达（'
+        'rest_count 至少为 2），无法导出',
+      );
     }
     for (var sec = s.startSection; sec <= s.endSection; sec++) {
-      kept.add((day: s.day, name: course.name, section: sec, room: s.room, rhythm: rhythm));
+      kept.add((
+        day: s.day,
+        name: course.name,
+        section: sec,
+        room: s.room,
+        rhythm: rhythm,
+      ));
     }
   }
   if (kept.isEmpty) throw const FormatException('没有可以用 CSES 表达的时段');
@@ -69,7 +83,8 @@ CsesExport exportCses(Timetable timetable) {
   }
 
   // 每个 (循环周, 星期) 一张日课表。
-  final buckets = <(int, int), List<({String name, int section, String? room})>>{};
+  final buckets =
+      <(int, int), List<({String name, int section, String? room})>>{};
   for (final e in kept) {
     final targetCycleWeeks = switch (e.rhythm) {
       'odd' => const [1],
@@ -77,8 +92,11 @@ CsesExport exportCses(Timetable timetable) {
       _ => weeksInCycle == 2 ? const [1, 2] : const [1],
     };
     for (final cw in targetCycleWeeks) {
-      buckets.putIfAbsent((cw, e.day), () => [])
-          .add((name: e.name, section: e.section, room: e.room));
+      buckets.putIfAbsent((cw, e.day), () => []).add((
+        name: e.name,
+        section: e.section,
+        room: e.room,
+      ));
     }
   }
 
@@ -96,8 +114,10 @@ CsesExport exportCses(Timetable timetable) {
     ..writeln('version: 2')
     ..writeln('configuration:')
     ..writeln('  name: ${_yaml(timetable.name)}')
-    ..writeln('  description: ${_yaml('由 DeskTile 课表岛导出，'
-        '学期第一周周一 ${_dateText(timetable.termStart)}，共 ${timetable.totalWeeks} 周')}')
+    ..writeln(
+      '  description: ${_yaml('由 DeskTile 课表岛导出，'
+      '学期第一周周一 ${_dateText(timetable.termStart)}，共 ${timetable.totalWeeks} 周')}',
+    )
     ..writeln('  cycle:')
     ..writeln('    work_count: ${workPerWeek * weeksInCycle}')
     ..writeln('    rest_count: ${restPerWeek * weeksInCycle}')
@@ -105,11 +125,9 @@ CsesExport exportCses(Timetable timetable) {
     ..writeln(spans.join('\n'))
     ..writeln('subjects:');
 
-  final subjectNames = buckets.values
-      .expand((list) => list.map((c) => c.name))
-      .toSet()
-      .toList()
-    ..sort();
+  final subjectNames =
+      buckets.values.expand((list) => list.map((c) => c.name)).toSet().toList()
+        ..sort();
   for (final name in subjectNames) {
     sb.writeln('  - name: ${_yaml(name)}');
     final teacher = subjectTeacher[name];
@@ -120,10 +138,13 @@ CsesExport exportCses(Timetable timetable) {
 
   sb.writeln('schedules:');
   final keys = buckets.keys.toList()
-    ..sort((a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : a.$2.compareTo(b.$2));
+    ..sort(
+      (a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : a.$2.compareTo(b.$2),
+    );
   for (final key in keys) {
     final (cycleWeek, day) = key;
-    final classes = buckets[key]!..sort((a, b) => a.section.compareTo(b.section));
+    final classes = buckets[key]!
+      ..sort((a, b) => a.section.compareTo(b.section));
     final label = weeksInCycle == 2
         ? '${weekDayName(day)}-${cycleWeek == 1 ? '单周' : '双周'}'
         : weekDayName(day);

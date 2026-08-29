@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:desktile/core/import/course_info_dto.dart';
 import 'package:desktile/core/import/cses_importer.dart';
 import 'package:desktile/core/import/exporter.dart';
+import 'package:desktile/core/models/schedule_change.dart';
 import 'package:desktile/core/week_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -27,8 +28,9 @@ void main() {
     });
 
     test('enable_day 同时给出两个循环周 -> 合并成每周', () {
-      final monMath = imported.courses
-          .firstWhere((c) => c.name == '数学' && c.day == 1);
+      final monMath = imported.courses.firstWhere(
+        (c) => c.name == '数学' && c.day == 1,
+      );
       expect(monMath.weeks.toSet(), allWeeks(16));
       expect(monMath.sections, [1]);
       expect(monMath.teacher, '李梅');
@@ -36,8 +38,9 @@ void main() {
     });
 
     test('只在循环第一周出现 -> 单周', () {
-      final tueMath = imported.courses
-          .firstWhere((c) => c.name == '数学' && c.day == 2);
+      final tueMath = imported.courses.firstWhere(
+        (c) => c.name == '数学' && c.day == 2,
+      );
       expect(tueMath.weeks.toSet(), oddWeeks(16));
     });
 
@@ -71,8 +74,13 @@ schedules:
 ''';
       expect(
         () => importCses(bad),
-        throwsA(isA<FormatException>()
-            .having((e) => e.message, 'message', contains('不是整数周'))),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('不是整数周'),
+          ),
+        ),
       );
     });
 
@@ -110,8 +118,13 @@ schedules:
 ''';
       expect(
         () => importCses(bad),
-        throwsA(isA<FormatException>()
-            .having((e) => e.message, 'message', contains('3 周循环'))),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('3 周循环'),
+          ),
+        ),
       );
     });
   });
@@ -165,14 +178,33 @@ schedules:
       expect(result.yaml, isNot(contains('"高等数学"')));
     });
 
+    test('临时安排无法表达时明确提示使用 JSON 备份', () {
+      final changed = t.copyWith(
+        scheduleChanges: [
+          ScheduleChange.cancellation(
+            id: 'cancel',
+            originalSessionId: 's1',
+            originalDate: DateTime(2026, 9, 7),
+          ),
+        ],
+      );
+      final result = exportCses(changed);
+      expect(result.warnings.single, contains('JSON 备份'));
+    });
+
     test('有周日的课时明确拒绝导出', () {
       final withSunday = t.copyWith(
         sessions: [t.sessions.first.copyWith(day: 7)],
       );
       expect(
         () => exportCses(withSunday),
-        throwsA(isA<FormatException>()
-            .having((e) => e.message, 'message', contains('周日'))),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('周日'),
+          ),
+        ),
       );
     });
   });

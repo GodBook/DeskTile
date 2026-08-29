@@ -1,7 +1,16 @@
 import 'models/course.dart';
+import 'models/schedule_change.dart';
 import 'models/time_slot.dart';
 import 'models/timetable.dart';
 import 'week_math.dart';
+
+enum SessionOccurrenceKind {
+  regular,
+  cancelled,
+  rescheduledSource,
+  rescheduledTarget,
+  extraClass,
+}
 
 /// 一个上课时段 + 它对应的课程 + 起止节次的时间，界面和提醒都直接用这个。
 class ResolvedSession {
@@ -10,12 +19,20 @@ class ResolvedSession {
     required this.course,
     required this.startSlot,
     required this.endSlot,
+    this.occurrence = SessionOccurrenceKind.regular,
+    this.change,
   });
 
   final CourseSession session;
   final Course course;
   final TimeSlot startSlot;
   final TimeSlot endSlot;
+  final SessionOccurrenceKind occurrence;
+  final ScheduleChange? change;
+
+  bool get isInactive =>
+      occurrence == SessionOccurrenceKind.cancelled ||
+      occurrence == SessionOccurrenceKind.rescheduledSource;
 
   int get startMinutes => startSlot.startMinutes;
   int get endMinutes => endSlot.endMinutes;
@@ -37,7 +54,12 @@ class ResolvedSession {
 typedef DatedSession = ({DateTime date, ResolvedSession session});
 
 /// 把 [CourseSession] 补全成 [ResolvedSession]；课程或节次时间缺失时返回 null。
-ResolvedSession? resolve(Timetable t, CourseSession s) {
+ResolvedSession? resolve(
+  Timetable t,
+  CourseSession s, {
+  SessionOccurrenceKind occurrence = SessionOccurrenceKind.regular,
+  ScheduleChange? change,
+}) {
   final course = t.courseById(s.courseId);
   final startSlot = t.slotAt(s.startSection);
   final endSlot = t.slotAt(s.endSection);
@@ -47,18 +69,98 @@ ResolvedSession? resolve(Timetable t, CourseSession s) {
     course: course,
     startSlot: startSlot,
     endSlot: endSlot,
+    occurrence: occurrence,
+    change: change,
   );
 }
 
 /// 第 [week] 周、星期 [day] 的课，按节次升序。
-List<ResolvedSession> sessionsOnWeekDay(Timetable t, int week, int day) {
+List<ResolvedSession> sessionsOnWeekDay(
+  Timetable t,
+  int week,
+  int day, {
+  bool includeChangedSources = false,
+}) => sessionsOnDate(
+  t,
+  dateOfWeekDay(t.termStart, week, day),
+  includeChangedSources: includeChangedSources,
+);
+
+/// 某个日期的实际课程；周视图可通过 [includeChangedSources] 同时显示已停课/调出的来源。
+List<ResolvedSession> sessionsOnDate(
+  Timetable t,
+  DateTime date, {
+  bool includeChangedSources = false,
+}) {
+  final weekDay = weekDayOfDate(t.termStart, date, t.totalWeeks);
+  if (weekDay == null) return const [];
   final result = <ResolvedSession>[];
   for (final s in t.sessions) {
-    if (s.day != day || !s.activeInWeek(week)) continue;
+    if (s.day != weekDay.day || !s.activeInWeek(weekDay.week)) continue;
+    ScheduleChange? sourceChange;
+    for (final change in t.scheduleChanges) {
+      if (change.sourceMatches(s.id, date)) {
+        sourceChange = change;
+        break;
+      }
+    }
+    if (sourceChange != null) {
+      if (includeChangedSources) {
+        final occurrence = sourceChange.type == ScheduleChangeType.cancellation
+            ? SessionOccurrenceKind.cancelled
+            : SessionOccurrenceKind.rescheduledSource;
+        final resolved = resolve(
+          t,
+          s,
+          occurrence: occurrence,
+          change: sourceChange,
+        );
+        if (resolved != null) result.add(resolved);
+      }
+      continue;
+    }
     final r = resolve(t, s);
     if (r != null) result.add(r);
   }
-  result.sort((a, b) => a.session.startSection.compareTo(b.session.startSection));
+
+  for (final change in t.scheduleChanges) {
+    if (!change.targets(date)) continue;
+    final courseId = switch (change.type) {
+      ScheduleChangeType.reschedule =>
+        t.sessionById(change.originalSessionId ?? '')?.courseId,
+      ScheduleChangeType.extraClass => change.courseId,
+      ScheduleChangeType.cancellation => null,
+    };
+    final start = change.startSection;
+    final end = change.endSection;
+    if (courseId == null || start == null || end == null) continue;
+    final session = CourseSession(
+      id: 'change:${change.id}',
+      courseId: courseId,
+      day: weekDay.day,
+      startSection: start,
+      endSection: end,
+      weeks: {weekDay.week},
+      room: change.room,
+    );
+    final occurrence = change.type == ScheduleChangeType.reschedule
+        ? SessionOccurrenceKind.rescheduledTarget
+        : SessionOccurrenceKind.extraClass;
+    final resolved = resolve(
+      t,
+      session,
+      occurrence: occurrence,
+      change: change,
+    );
+    if (resolved != null) result.add(resolved);
+  }
+
+  result.sort((a, b) {
+    final section = a.session.startSection.compareTo(b.session.startSection);
+    if (section != 0) return section;
+    if (a.isInactive == b.isInactive) return 0;
+    return a.isInactive ? -1 : 1;
+  });
   return result;
 }
 
@@ -66,9 +168,10 @@ List<ResolvedSession> sessionsOnWeekDay(Timetable t, int week, int day) {
 List<DatedSession> agendaForDate(Timetable t, DateTime date) {
   final wd = weekDayOfDate(t.termStart, date, t.totalWeeks);
   if (wd == null) return const [];
-  return sessionsOnWeekDay(t, wd.week, wd.day)
-      .map((s) => (date: dateOnly(date), session: s))
-      .toList();
+  return sessionsOnDate(
+    t,
+    date,
+  ).map((s) => (date: dateOnly(date), session: s)).toList();
 }
 
 /// 从 [now] 起还没结束的课，按时间升序。跨天向后找，最多 [lookAheadDays] 天。

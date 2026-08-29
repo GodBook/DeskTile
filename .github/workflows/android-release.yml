@@ -9,7 +9,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: android-release-${{ github.ref }}
+  # Android 与 Windows 会写入同一个 Release，必须串行发布资产。
+  group: desktile-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -110,14 +111,13 @@ jobs:
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" dist/* --repo "$GITHUB_REPOSITORY" --clobber
-          else
-            gh release create "$tag" dist/* \
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" \
               --repo "$GITHUB_REPOSITORY" \
               --title "DeskTile 课表岛 ${tag}" \
               --generate-notes
           fi
+          gh release upload "$tag" dist/* --repo "$GITHUB_REPOSITORY" --clobber
 
       - name: Remove signing material
         if: always()

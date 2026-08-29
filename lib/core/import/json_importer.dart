@@ -1,6 +1,10 @@
 import 'dart:convert';
 
+import '../models/schedule_change.dart';
+import '../models/task_item.dart';
 import '../models/time_slot.dart';
+import '../models/timetable.dart';
+import '../week_math.dart';
 import 'course_info_dto.dart';
 
 /// 导入小爱课程表风格的 JSON。
@@ -49,6 +53,8 @@ ImportedSchedule importCourseInfosJson(String content, {int totalWeeks = 20}) {
     termStart: payload.termStart,
     totalWeeks: payload.totalWeeks,
     timeSlots: _parseSectionTimes(payload.rawTimes, warnings),
+    sourceTimetable: payload.sourceTimetable,
+    tasks: payload.tasks,
   );
 }
 
@@ -59,6 +65,8 @@ class _JsonPayload {
     this.rawTimes,
     this.name,
     this.termStart,
+    this.sourceTimetable,
+    this.tasks,
   });
 
   final List<dynamic> rawCourses;
@@ -66,6 +74,8 @@ class _JsonPayload {
   final String? name;
   final DateTime? termStart;
   final int totalWeeks;
+  final Timetable? sourceTimetable;
+  final List<TaskItem>? tasks;
 }
 
 _JsonPayload _readPayload(
@@ -159,24 +169,101 @@ _JsonPayload _readBackupPayload(
     selected,
     fallbackTotalWeeks: fallbackTotalWeeks,
     warnings: warnings,
+    tasks: _readBackupTasks(root, warnings),
   );
+}
+
+List<TaskItem>? _readBackupTasks(
+  Map<String, dynamic> root,
+  List<String> warnings,
+) {
+  if (!root.containsKey('tasks')) return null;
+  final rawTasks = root['tasks'];
+  if (rawTasks is! List) {
+    warnings.add('备份中的作业与待办格式不正确，已保留当前任务列表');
+    return null;
+  }
+  final tasks = <TaskItem>[];
+  for (var index = 0; index < rawTasks.length; index++) {
+    final item = rawTasks[index];
+    if (item is! Map) {
+      warnings.add('备份中的第 ${index + 1} 项作业或待办格式不正确，已忽略');
+      continue;
+    }
+    try {
+      tasks.add(TaskItem.fromJson(Map<String, dynamic>.from(item)));
+    } catch (_) {
+      warnings.add('备份中的第 ${index + 1} 项作业或待办格式不正确，已忽略');
+    }
+  }
+  return tasks;
 }
 
 _JsonPayload _payloadFromTimetable(
   Map<String, dynamic> table, {
   required int fallbackTotalWeeks,
   required List<String> warnings,
+  List<TaskItem>? tasks,
 }) {
   final rawTimes = table['timeSlots'] is List
       ? table['timeSlots'] as List<dynamic>
       : null;
+  final rawCourses = <dynamic>[..._backupCourseRecords(table, warnings)];
+  Timetable? sourceTimetable;
+  try {
+    sourceTimetable = Timetable.fromJson(table);
+  } catch (_) {
+    final changes = table['scheduleChanges'];
+    if (changes is List && changes.isNotEmpty) {
+      warnings.add('备份中的临时安排无法完整恢复，已按普通课表导入');
+    }
+  }
+  if (rawCourses.isEmpty && sourceTimetable != null) {
+    rawCourses.addAll(_standaloneExtraClassRecords(sourceTimetable));
+  }
   return _JsonPayload(
-    rawCourses: _backupCourseRecords(table, warnings),
+    rawCourses: rawCourses,
     rawTimes: rawTimes,
     name: _nonEmptyString(table['name']),
     termStart: _parseDate(table['termStart']),
     totalWeeks: _positiveInt(table['totalWeeks']) ?? fallbackTotalWeeks,
+    sourceTimetable: sourceTimetable,
+    tasks: tasks,
   );
+}
+
+List<dynamic> _standaloneExtraClassRecords(Timetable timetable) {
+  final records = <dynamic>[];
+  for (final change in timetable.scheduleChanges) {
+    final date = change.targetDate;
+    final start = change.startSection;
+    final end = change.endSection;
+    final course = timetable.courseById(change.courseId ?? '');
+    if (change.type != ScheduleChangeType.extraClass ||
+        date == null ||
+        start == null ||
+        end == null ||
+        course == null) {
+      continue;
+    }
+    final weekDay = weekDayOfDate(
+      timetable.termStart,
+      date,
+      timetable.totalWeeks,
+    );
+    if (weekDay == null) continue;
+    records.add({
+      'name': course.name,
+      'teacher': course.teacher ?? '',
+      'position': change.room ?? '',
+      'day': weekDay.day,
+      'weeks': [weekDay.week],
+      'sections': [
+        for (var section = start; section <= end; section++) section,
+      ],
+    });
+  }
+  return records;
 }
 
 /// 把备份里的 courses + sessions 还原成 courseInfos 形状。

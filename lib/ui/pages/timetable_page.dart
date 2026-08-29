@@ -1,17 +1,23 @@
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/agenda.dart';
 import '../../core/models/timetable.dart';
 import '../../core/week_math.dart';
 import '../../data/app_state.dart';
 import '../theme.dart';
+import 'schedule_change_editor.dart';
 import 'session_editor.dart';
 
 const _rowHeight = 58.0;
 const _timeColumnWidth = 52.0;
 const _headerHeight = 44.0;
+const _minGridScale = 0.65;
+const _maxGridScale = 2.5;
+const _gridScaleStep = 0.1;
 
 /// 周视图：左侧节次时间轴，上方周一~周日，中间是课程块。
 class TimetablePage extends StatefulWidget {
@@ -113,6 +119,17 @@ class _Toolbar extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: timetable.courses.isEmpty ? '先添加常规课程' : '添加补课',
+                      onPressed: timetable.courses.isEmpty
+                          ? null
+                          : () => showScheduleChangeEditor(
+                              context,
+                              week: week,
+                              initialDate: _initialChangeDate(timetable, week),
+                            ),
+                      icon: const Icon(Icons.event_available, size: 20),
+                    ),
                     FilledButton.icon(
                       onPressed: () => showSessionEditor(context, week: week),
                       icon: const Icon(Icons.add, size: 18),
@@ -178,6 +195,18 @@ class _Toolbar extends StatelessWidget {
                 label: Text(realWeek == null ? '不在学期内' : '回到本周'),
               ),
               const Spacer(),
+              IconButton(
+                tooltip: timetable.courses.isEmpty ? '先添加常规课程' : '添加补课',
+                onPressed: timetable.courses.isEmpty
+                    ? null
+                    : () => showScheduleChangeEditor(
+                        context,
+                        week: week,
+                        initialDate: _initialChangeDate(timetable, week),
+                      ),
+                icon: const Icon(Icons.event_available, size: 20),
+              ),
+              const SizedBox(width: 4),
               FilledButton.icon(
                 onPressed: () => showSessionEditor(context, week: week),
                 icon: const Icon(Icons.add, size: 18),
@@ -191,15 +220,61 @@ class _Toolbar extends StatelessWidget {
   }
 }
 
-class _Grid extends StatelessWidget {
+DateTime _initialChangeDate(Timetable timetable, int week) {
+  final today = weekDayOfDate(
+    timetable.termStart,
+    DateTime.now(),
+    timetable.totalWeeks,
+  );
+  final day = today?.week == week ? today!.day : 1;
+  return dateOfWeekDay(timetable.termStart, week, day);
+}
+
+class _Grid extends StatefulWidget {
   const _Grid({required this.timetable, required this.week});
 
   final Timetable timetable;
   final int week;
 
   @override
+  State<_Grid> createState() => _GridState();
+}
+
+class _GridState extends State<_Grid> {
+  double _windowsScale = 1;
+
+  void _handleWindowsPointerSignal(PointerSignalEvent event) {
+    if (defaultTargetPlatform != TargetPlatform.windows ||
+        event is! PointerScrollEvent ||
+        !HardwareKeyboard.instance.isControlPressed ||
+        event.scrollDelta.dy == 0) {
+      return;
+    }
+
+    GestureBinding.instance.pointerSignalResolver.register(event, (
+      resolvedEvent,
+    ) {
+      if (!mounted || resolvedEvent is! PointerScrollEvent) return;
+      final direction = resolvedEvent.scrollDelta.dy < 0 ? 1 : -1;
+      final nextScale = (_windowsScale + direction * _gridScaleStep)
+          .clamp(_minGridScale, _maxGridScale)
+          .toDouble();
+      if (nextScale == _windowsScale) return;
+      setState(() => _windowsScale = nextScale);
+    });
+  }
+
+  Widget _windowsZoomRegion({required Widget child}) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerSignal: _handleWindowsPointerSignal,
+      child: child,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final t = timetable;
+    final t = widget.timetable;
     final dayCount = t.showWeekend ? 7 : 5;
     final maxSection = t.maxSection;
     if (maxSection == 0) {
@@ -222,8 +297,8 @@ class _Grid extends StatelessWidget {
             alignment: Alignment.topLeft,
             boundaryMargin: const EdgeInsets.all(24),
             constrained: false,
-            minScale: 0.65,
-            maxScale: 2.5,
+            minScale: _minGridScale,
+            maxScale: _maxGridScale,
             child: SizedBox(
               width: gridWidth,
               height: _headerHeight + _rowHeight * maxSection,
@@ -231,10 +306,10 @@ class _Grid extends StatelessWidget {
                 children: [
                   _HeaderRow(
                     timetable: t,
-                    week: week,
+                    week: widget.week,
                     dayCount: dayCount,
                     colWidth: colWidth,
-                    todayDay: today?.week == week ? today?.day : null,
+                    todayDay: today?.week == widget.week ? today?.day : null,
                   ),
                   Expanded(
                     child: Row(
@@ -244,11 +319,12 @@ class _Grid extends StatelessWidget {
                         for (var day = 1; day <= dayCount; day++)
                           _DayColumn(
                             timetable: t,
-                            week: week,
+                            week: widget.week,
                             day: day,
                             width: colWidth,
                             maxSection: maxSection,
-                            isToday: today?.week == week && today?.day == day,
+                            isToday:
+                                today?.week == widget.week && today?.day == day,
                           ),
                       ],
                     ),
@@ -259,39 +335,97 @@ class _Grid extends StatelessWidget {
           );
         }
 
+        final scale = defaultTargetPlatform == TargetPlatform.windows
+            ? _windowsScale
+            : 1.0;
+        final scaledGridWidth = gridWidth * scale;
+        final bodyHeight = _rowHeight * maxSection;
+
         // 表头和内容放在同一个水平视口中，两者始终使用同一滚动偏移。
         return SingleChildScrollView(
           key: const ValueKey('timetable-horizontal-scroll'),
           scrollDirection: Axis.horizontal,
           child: SizedBox(
-            width: gridWidth,
+            width: scaledGridWidth,
             height: constraints.maxHeight,
             child: Column(
               children: [
                 // 星期表头固定在上面，纵向滚动时不会跟着滚掉。
-                _HeaderRow(
-                  timetable: t,
-                  week: week,
-                  dayCount: dayCount,
-                  colWidth: colWidth,
-                  todayDay: today?.week == week ? today?.day : null,
+                _windowsZoomRegion(
+                  child: SizedBox(
+                    width: scaledGridWidth,
+                    height: _headerHeight * scale,
+                    child: OverflowBox(
+                      alignment: Alignment.topLeft,
+                      minWidth: gridWidth,
+                      maxWidth: gridWidth,
+                      minHeight: _headerHeight,
+                      maxHeight: _headerHeight,
+                      child: Transform.scale(
+                        key: const ValueKey('timetable-windows-header-zoom'),
+                        scale: scale,
+                        alignment: Alignment.topLeft,
+                        child: SizedBox(
+                          width: gridWidth,
+                          height: _headerHeight,
+                          child: _HeaderRow(
+                            timetable: t,
+                            week: widget.week,
+                            dayCount: dayCount,
+                            colWidth: colWidth,
+                            todayDay: today?.week == widget.week
+                                ? today?.day
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
                 Expanded(
                   child: SingleChildScrollView(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _TimeColumn(timetable: t, maxSection: maxSection),
-                        for (var day = 1; day <= dayCount; day++)
-                          _DayColumn(
-                            timetable: t,
-                            week: week,
-                            day: day,
-                            width: colWidth,
-                            maxSection: maxSection,
-                            isToday: today?.week == week && today?.day == day,
+                    key: const ValueKey('timetable-vertical-scroll'),
+                    child: _windowsZoomRegion(
+                      child: SizedBox(
+                        width: scaledGridWidth,
+                        height: bodyHeight * scale,
+                        child: OverflowBox(
+                          alignment: Alignment.topLeft,
+                          minWidth: gridWidth,
+                          maxWidth: gridWidth,
+                          minHeight: bodyHeight,
+                          maxHeight: bodyHeight,
+                          child: Transform.scale(
+                            key: const ValueKey('timetable-windows-body-zoom'),
+                            scale: scale,
+                            alignment: Alignment.topLeft,
+                            child: SizedBox(
+                              width: gridWidth,
+                              height: bodyHeight,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _TimeColumn(
+                                    timetable: t,
+                                    maxSection: maxSection,
+                                  ),
+                                  for (var day = 1; day <= dayCount; day++)
+                                    _DayColumn(
+                                      timetable: t,
+                                      week: widget.week,
+                                      day: day,
+                                      width: colWidth,
+                                      maxSection: maxSection,
+                                      isToday:
+                                          today?.week == widget.week &&
+                                          today?.day == day,
+                                    ),
+                                ],
+                              ),
+                            ),
                           ),
-                      ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -446,7 +580,13 @@ class _DayColumn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final sessions = sessionsOnWeekDay(timetable, week, day);
+    final sessions = sessionsOnWeekDay(
+      timetable,
+      week,
+      day,
+      includeChangedSources: true,
+    );
+    final date = dateOfWeekDay(timetable.termStart, week, day);
 
     return SizedBox(
       width: width,
@@ -477,6 +617,18 @@ class _DayColumn extends StatelessWidget {
                       day: day,
                       startSection: s,
                     ),
+                    onLongPress: () => showScheduleChangeEditor(
+                      context,
+                      week: week,
+                      initialDate: date,
+                      initialStartSection: s,
+                    ),
+                    onSecondaryTap: () => showScheduleChangeEditor(
+                      context,
+                      week: week,
+                      initialDate: date,
+                      initialStartSection: s,
+                    ),
                   ),
                 ),
             ],
@@ -504,18 +656,47 @@ class _CourseBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = courseColor(session.course.colorSeed, theme.brightness);
-    final room = session.session.room;
+    final courseBaseColor = courseColor(
+      session.course.colorSeed,
+      theme.brightness,
+    );
+    final inactive = session.isInactive;
+    final color = inactive ? theme.colorScheme.outline : courseBaseColor;
+    final status = switch (session.occurrence) {
+      SessionOccurrenceKind.regular => null,
+      SessionOccurrenceKind.cancelled => '停课',
+      SessionOccurrenceKind.rescheduledSource => '调出',
+      SessionOccurrenceKind.rescheduledTarget => '调课',
+      SessionOccurrenceKind.extraClass => '补课',
+    };
+    final change = session.change;
+    final detail =
+        session.occurrence == SessionOccurrenceKind.rescheduledSource &&
+            change?.targetDate != null
+        ? '调至 ${change!.targetDate!.month}/${change.targetDate!.day} '
+              '第${change.startSection}-${change.endSection}节'
+        : session.session.room;
 
     return Material(
       color: color.withValues(
-        alpha: theme.brightness == Brightness.dark ? 0.34 : 0.16,
+        alpha: inactive
+            ? theme.brightness == Brightness.dark
+                  ? 0.2
+                  : 0.1
+            : theme.brightness == Brightness.dark
+            ? 0.34
+            : 0.16,
       ),
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: () =>
-            showSessionEditor(context, week: week, session: session.session),
+        onTap: () => session.change == null
+            ? showSessionEditor(context, week: week, session: session.session)
+            : showScheduleChangeEditor(
+                context,
+                week: week,
+                change: session.change,
+              ),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
           decoration: BoxDecoration(
@@ -526,28 +707,45 @@ class _CourseBlock extends StatelessWidget {
           // 按可用高度决定显示到哪一层，而不是硬塞导致溢出。
           child: LayoutBuilder(
             builder: (context, box) {
-              final showRoom =
-                  box.maxHeight >= 46 && room != null && room.isNotEmpty;
+              final showDetail =
+                  box.maxHeight >= 46 && detail != null && detail.isNotEmpty;
               final showTeacher =
                   box.maxHeight >= 86 &&
                   (session.course.teacher?.isNotEmpty ?? false);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Flexible(
-                    child: Text(
-                      session.course.name,
-                      maxLines: box.maxHeight >= 86 ? 2 : 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        height: 1.15,
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          session.course.name,
+                          maxLines: box.maxHeight >= 86 ? 2 : 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            height: 1.15,
+                            decoration: inactive
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
                       ),
-                    ),
+                      if (status != null) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          status,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: inactive ? theme.colorScheme.outline : color,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  if (showRoom)
+                  if (showDetail)
                     Text(
-                      room,
+                      detail,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.labelSmall?.copyWith(

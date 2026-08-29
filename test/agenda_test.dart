@@ -1,4 +1,5 @@
 import 'package:desktile/core/agenda.dart';
+import 'package:desktile/core/models/schedule_change.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'helpers.dart';
@@ -34,12 +35,101 @@ void main() {
     test('第 1 周周一', () {
       final list = agendaForDate(t, DateTime(2026, 9, 7));
       expect(list.length, 2);
-      expect(list.first.session.startOn(list.first.date), DateTime(2026, 9, 7, 8));
+      expect(
+        list.first.session.startOn(list.first.date),
+        DateTime(2026, 9, 7, 8),
+      );
     });
 
     test('学期外返回空', () {
       expect(agendaForDate(t, DateTime(2026, 9, 1)), isEmpty);
       expect(agendaForDate(t, DateTime(2027, 6, 1)), isEmpty);
+    });
+  });
+
+  group('临时课程变更', () {
+    test('停课从实际日程移除，但周视图仍能显示停课来源', () {
+      final changed = t.copyWith(
+        scheduleChanges: [
+          ScheduleChange.cancellation(
+            id: 'change1',
+            originalSessionId: 's1',
+            originalDate: DateTime(2026, 9, 7),
+          ),
+        ],
+      );
+
+      expect(
+        agendaForDate(
+          changed,
+          DateTime(2026, 9, 7),
+        ).map((item) => item.session.course.name),
+        ['大学英语'],
+      );
+      final visual = sessionsOnWeekDay(
+        changed,
+        1,
+        1,
+        includeChangedSources: true,
+      );
+      expect(visual.length, 2);
+      expect(visual.first.occurrence, SessionOccurrenceKind.cancelled);
+      expect(visual.first.isInactive, isTrue);
+    });
+
+    test('调课从原日期移除并在目标日期按新节次和教室出现', () {
+      final changed = t.copyWith(
+        scheduleChanges: [
+          ScheduleChange.reschedule(
+            id: 'change2',
+            originalSessionId: 's1',
+            originalDate: DateTime(2026, 9, 7),
+            targetDate: DateTime(2026, 9, 8),
+            startSection: 3,
+            endSection: 4,
+            room: '临时教室',
+          ),
+        ],
+      );
+
+      expect(
+        agendaForDate(
+          changed,
+          DateTime(2026, 9, 7),
+        ).map((item) => item.session.course.name),
+        ['大学英语'],
+      );
+      final target = agendaForDate(changed, DateTime(2026, 9, 8));
+      expect(target.map((item) => item.session.course.name), ['线性代数', '高等数学']);
+      expect(
+        target.last.session.occurrence,
+        SessionOccurrenceKind.rescheduledTarget,
+      );
+      expect(target.last.session.session.startSection, 3);
+      expect(target.last.session.session.room, '临时教室');
+    });
+
+    test('补课作为一次性课程加入目标日期', () {
+      final changed = t.copyWith(
+        scheduleChanges: [
+          ScheduleChange.extraClass(
+            id: 'change3',
+            courseId: 'c2',
+            targetDate: DateTime(2026, 9, 10),
+            startSection: 5,
+            endSection: 6,
+            room: '补课教室',
+          ),
+        ],
+      );
+
+      final target = agendaForDate(changed, DateTime(2026, 9, 10));
+      expect(target.single.session.course.name, '大学英语');
+      expect(
+        target.single.session.occurrence,
+        SessionOccurrenceKind.extraClass,
+      );
+      expect(target.single.session.session.id, 'change:change3');
     });
   });
 
@@ -59,7 +149,10 @@ void main() {
     test('课间：没有正在上的课', () {
       // 09:35 下课，09:55 上课
       expect(currentSession(t, DateTime(2026, 9, 7, 9, 45)), isNull);
-      expect(nextSession(t, DateTime(2026, 9, 7, 9, 45))?.session.course.name, '大学英语');
+      expect(
+        nextSession(t, DateTime(2026, 9, 7, 9, 45))?.session.course.name,
+        '大学英语',
+      );
     });
 
     test('当天课全上完后跨天找下一节', () {

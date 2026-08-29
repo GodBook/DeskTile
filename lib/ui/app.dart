@@ -5,6 +5,7 @@ import '../platform/notifications.dart';
 import 'pages/exams_page.dart';
 import 'pages/import_export_page.dart';
 import 'pages/settings_page.dart';
+import 'pages/tasks_page.dart';
 import 'pages/timetable_page.dart';
 import 'theme.dart';
 
@@ -52,6 +53,7 @@ class _ShellState extends State<_Shell> {
   Widget build(BuildContext context) {
     final pages = [
       const TimetablePage(),
+      const TasksPage(),
       const ExamsPage(),
       const ImportExportPage(),
       SettingsPage(reminders: widget.reminders),
@@ -81,6 +83,11 @@ class _ShellState extends State<_Shell> {
                             icon: Icon(Icons.calendar_view_week_outlined),
                             selectedIcon: Icon(Icons.calendar_view_week),
                             label: Text('课表'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.assignment_outlined),
+                            selectedIcon: Icon(Icons.assignment),
+                            label: Text('待办'),
                           ),
                           NavigationRailDestination(
                             icon: Icon(Icons.event_note_outlined),
@@ -113,6 +120,11 @@ class _ShellState extends State<_Shell> {
                       icon: Icon(Icons.calendar_view_week_outlined),
                       selectedIcon: Icon(Icons.calendar_view_week),
                       label: '课表',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.assignment_outlined),
+                      selectedIcon: Icon(Icons.assignment),
+                      label: '待办',
                     ),
                     NavigationDestination(
                       icon: Icon(Icons.event_note_outlined),

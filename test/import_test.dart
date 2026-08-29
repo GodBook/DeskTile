@@ -5,6 +5,10 @@ import 'package:desktile/core/import/course_info_dto.dart';
 import 'package:desktile/core/import/csv_importer.dart';
 import 'package:desktile/core/import/ics_importer.dart';
 import 'package:desktile/core/import/json_importer.dart';
+import 'package:desktile/core/models/course.dart';
+import 'package:desktile/core/models/schedule_change.dart';
+import 'package:desktile/core/models/task_item.dart';
+import 'package:desktile/core/models/timetable.dart';
 import 'package:desktile/core/week_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -23,7 +27,9 @@ void main() {
     });
 
     test('中文星期和数字星期都认', () {
-      final byName = {for (final c in imported.courses) '${c.name}|${c.day}': c};
+      final byName = {
+        for (final c in imported.courses) '${c.name}|${c.day}': c,
+      };
       expect(byName.containsKey('大学英语|1'), isTrue);
       expect(byName.containsKey('程序设计基础|4'), isTrue);
     });
@@ -61,12 +67,15 @@ void main() {
       expect(warnings, isEmpty);
 
       final math = t.courses.firstWhere((c) => c.name == '高等数学A');
-      final mathSessions = t.sessions.where((s) => s.courseId == math.id).toList();
+      final mathSessions = t.sessions
+          .where((s) => s.courseId == math.id)
+          .toList();
       expect(mathSessions.length, 2);
       expect(mathSessions.map((s) => s.day).toSet(), {1, 4});
 
-      final prog = t.sessions.firstWhere((s) =>
-          t.courseById(s.courseId)!.name == '程序设计基础');
+      final prog = t.sessions.firstWhere(
+        (s) => t.courseById(s.courseId)!.name == '程序设计基础',
+      );
       expect(prog.startSection, 1);
       expect(prog.endSection, 4);
     });
@@ -74,11 +83,13 @@ void main() {
     test('缺列时给出可读的错误', () {
       expect(
         () => importCsv('课程名称,星期\n数学,1\n'),
-        throwsA(isA<FormatException>().having(
-          (e) => e.message,
-          'message',
-          allOf(contains('周次'), contains('节次')),
-        )),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('周次'), contains('节次')),
+          ),
+        ),
       );
     });
 
@@ -146,20 +157,46 @@ void main() {
     });
 
     test('空的 courseInfos 报错', () {
-      expect(() => importCourseInfosJson('{"courseInfos":[]}'),
-          throwsFormatException);
+      expect(
+        () => importCourseInfosJson('{"courseInfos":[]}'),
+        throwsFormatException,
+      );
     });
 
     test('能导入本程序导出的完整备份，并选择活动课表', () {
-      final active = buildTestTimetable(totalWeeks: 16);
+      final active = buildTestTimetable(totalWeeks: 16).copyWith(
+        scheduleChanges: [
+          ScheduleChange.reschedule(
+            id: 'move',
+            originalSessionId: 's1',
+            originalDate: DateTime(2026, 9, 7),
+            targetDate: DateTime(2026, 9, 8),
+            startSection: 5,
+            endSection: 6,
+            room: '临时教室',
+          ),
+        ],
+      );
       final inactive = Map<String, dynamic>.from(active.toJson())
         ..['id'] = 'inactive'
         ..['name'] = '不应导入';
+      final task = TaskItem(
+        id: 'task1',
+        title: '完成高数习题',
+        kind: TaskKind.homework,
+        createdAt: DateTime(2026, 9, 7, 9),
+        dueAt: DateTime(2026, 9, 8, 20),
+        timetableId: active.id,
+        courseId: 'c1',
+        note: '第二章第 1-10 题',
+        priority: TaskPriority.important,
+      );
       final backup = jsonEncode({
-        'schemaVersion': 1,
+        'schemaVersion': 3,
         'activeTimetableId': active.id,
         'timetables': [inactive, active.toJson()],
         'exams': const [],
+        'tasks': [task.toJson()],
         'settings': const {},
       });
 
@@ -171,10 +208,91 @@ void main() {
       expect(imported.courses.length, 4);
       expect(imported.timeSlots, isNotNull);
       expect(imported.timeSlots!.length, 12);
+      expect(imported.tasks, isNotNull);
+      expect(imported.tasks, hasLength(1));
+      expect(imported.tasks!.single.title, '完成高数习题');
+      expect(imported.tasks!.single.kind, TaskKind.homework);
+      expect(imported.tasks!.single.timetableId, active.id);
+      expect(imported.tasks!.single.courseId, 'c1');
+      expect(imported.tasks!.single.priority, TaskPriority.important);
+      expect(imported.tasks!.single.dueAt, DateTime(2026, 9, 8, 20));
+      expect(imported.tasks!.single.note, '第二章第 1-10 题');
       final math = imported.courses.firstWhere((c) => c.name == '高等数学');
       expect(math.teacher, '张伟');
       expect(math.position, '教三-305');
       expect(math.sections, [1, 2]);
+
+      final rebuilt = buildTimetable(
+        id: active.id,
+        name: active.name,
+        termStart: active.termStart,
+        imported: imported,
+        warnings: [],
+      );
+      expect(rebuilt.sessions.first.id, 's1');
+      expect(rebuilt.scheduleChanges.single.id, 'move');
+      expect(rebuilt.scheduleChanges.single.targetDate, DateTime(2026, 9, 8));
+    });
+
+    test('恢复备份时修改学期起始日会同步平移临时安排', () {
+      final source = buildTestTimetable().copyWith(
+        scheduleChanges: [
+          ScheduleChange.extraClass(
+            id: 'extra',
+            courseId: 'c1',
+            targetDate: DateTime(2026, 9, 10),
+            startSection: 5,
+            endSection: 6,
+          ),
+        ],
+      );
+      final imported = importCourseInfosJson(jsonEncode(source.toJson()));
+      final rebuilt = buildTimetable(
+        id: source.id,
+        name: source.name,
+        termStart: source.termStart.add(const Duration(days: 7)),
+        imported: imported,
+        warnings: [],
+      );
+
+      expect(rebuilt.scheduleChanges.single.targetDate, DateTime(2026, 9, 17));
+    });
+
+    test('只有补课没有常规时段的备份也能完整恢复', () {
+      final source = Timetable(
+        id: 'extra-only',
+        name: '补课课表',
+        termStart: testTermStart,
+        courses: const [Course(id: 'c1', name: '实验课')],
+        scheduleChanges: [
+          ScheduleChange.extraClass(
+            id: 'extra',
+            courseId: 'c1',
+            targetDate: DateTime(2026, 9, 10),
+            startSection: 5,
+            endSection: 6,
+            room: '实验楼-201',
+          ),
+        ],
+      );
+
+      final imported = importCourseInfosJson(jsonEncode(source.toJson()));
+      final rebuilt = buildTimetable(
+        id: source.id,
+        name: source.name,
+        termStart: source.termStart,
+        imported: imported,
+        warnings: [],
+      );
+
+      expect(imported.courseNames, {'实验课'});
+      expect(rebuilt.sessions, isEmpty);
+      expect(rebuilt.courses.single.id, 'c1');
+      expect(
+        rebuilt.scheduleChanges.single.type,
+        ScheduleChangeType.extraClass,
+      );
+      expect(rebuilt.scheduleChanges.single.room, '实验楼-201');
     });
 
     test('带 UTF-8 BOM 的备份也能导入', () {
@@ -252,7 +370,9 @@ END:VCALENDAR
 
     test('没有事件时报错', () {
       expect(
-        () => importIcs('BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:x\nEND:VCALENDAR\n'),
+        () => importIcs(
+          'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:x\nEND:VCALENDAR\n',
+        ),
         throwsFormatException,
       );
     });

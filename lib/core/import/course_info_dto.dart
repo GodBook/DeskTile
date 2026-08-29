@@ -1,7 +1,9 @@
 import '../models/course.dart';
+import '../models/task_item.dart';
 import '../models/time_slot.dart';
 import '../models/timetable.dart';
 import '../stable_hash.dart';
+import '../week_math.dart';
 import '../weeks_parser.dart';
 
 /// 导入过程中的中间结构，字段与小爱课程表社区解析器的 `courseInfos` 一一对应。
@@ -58,13 +60,13 @@ class CourseInfoDto {
   }
 
   Map<String, dynamic> toAiSchedule() => {
-        'name': name,
-        'teacher': teacher ?? '',
-        'position': position ?? '',
-        'day': day,
-        'weeks': weeks,
-        'sections': sections.map((s) => {'section': s}).toList(),
-      };
+    'name': name,
+    'teacher': teacher ?? '',
+    'position': position ?? '',
+    'day': day,
+    'weeks': weeks,
+    'sections': sections.map((s) => {'section': s}).toList(),
+  };
 }
 
 String? _clean(Object? value) {
@@ -87,8 +89,10 @@ List<CourseInfoDto> mergeCourseInfos(Iterable<CourseInfoDto> input) {
       dto.position ?? '',
       (dto.weeks.toList()..sort()).join(','),
     ].join('|');
-    final entry =
-        grouped.putIfAbsent(key, () => (sample: dto, sections: <int>{}));
+    final entry = grouped.putIfAbsent(
+      key,
+      () => (sample: dto, sections: <int>{}),
+    );
     entry.sections.addAll(dto.sections);
   }
   return [
@@ -113,6 +117,8 @@ class ImportedSchedule {
     this.termStart,
     this.totalWeeks,
     this.timeSlots,
+    this.sourceTimetable,
+    this.tasks,
   });
 
   final List<CourseInfoDto> courses;
@@ -121,6 +127,12 @@ class ImportedSchedule {
   final DateTime? termStart;
   final int? totalWeeks;
   final List<TimeSlot>? timeSlots;
+
+  /// DeskTile JSON 备份中的原始课表，用于保留临时变更和内部关联 id。
+  final Timetable? sourceTimetable;
+
+  /// 新版 DeskTile 完整备份中的作业与待办；null 表示导入文件不管理任务。
+  final List<TaskItem>? tasks;
 
   int get sessionCount => courses.length;
   Set<String> get courseNames => courses.map((c) => c.name).toSet();
@@ -141,6 +153,23 @@ Timetable buildTimetable({
 }) {
   final weeks = totalWeeks ?? imported.totalWeeks ?? 20;
   final slots = timeSlots ?? imported.timeSlots ?? kDefaultTimeSlots;
+  final source = imported.sourceTimetable;
+  if (source != null) {
+    final shiftDays = daysBetween(source.termStart, termStart);
+    return Timetable(
+      id: id,
+      name: name,
+      termStart: termStart,
+      totalWeeks: weeks,
+      timeSlots: slots,
+      showWeekend: source.showWeekend,
+      courses: source.courses,
+      sessions: source.sessions,
+      scheduleChanges: source.scheduleChanges
+          .map((change) => change.shiftedByDays(shiftDays))
+          .toList(),
+    );
+  }
   final courses = <String, Course>{};
   final sessions = <CourseSession>[];
 
@@ -175,26 +204,35 @@ Timetable buildTimetable({
     );
 
     for (final range in compressRanges(dto.sections)) {
-      final sid = 's${stableHash('${course.id}|${dto.day}|${range.$1}-${range.$2}|'
+      final sid =
+          's${stableHash('${course.id}|${dto.day}|${range.$1}-${range.$2}|'
           '${(validWeeks.toList()..sort()).join(",")}|${dto.position ?? ""}')}';
-      sessions.add(CourseSession(
-        id: sid,
-        courseId: course.id,
-        day: dto.day,
-        startSection: range.$1,
-        endSection: range.$2,
-        weeks: validWeeks,
-        room: dto.position,
-      ));
+      sessions.add(
+        CourseSession(
+          id: sid,
+          courseId: course.id,
+          day: dto.day,
+          startSection: range.$1,
+          endSection: range.$2,
+          weeks: validWeeks,
+          room: dto.position,
+        ),
+      );
     }
   }
 
-  final maxSection = slots.map((s) => s.index).fold<int>(0, (a, b) => a > b ? a : b);
+  final maxSection = slots
+      .map((s) => s.index)
+      .fold<int>(0, (a, b) => a > b ? a : b);
   for (final s in sessions) {
     if (s.endSection > maxSection) {
-      final courseName = courses.values.firstWhere((c) => c.id == s.courseId).name;
-      warnings.add('$courseName：第${s.endSection}节超出作息表的 $maxSection 节，'
-          '请到设置里补充节次时间');
+      final courseName = courses.values
+          .firstWhere((c) => c.id == s.courseId)
+          .name;
+      warnings.add(
+        '$courseName：第${s.endSection}节超出作息表的 $maxSection 节，'
+        '请到设置里补充节次时间',
+      );
     }
   }
 

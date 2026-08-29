@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../core/models/exam.dart';
 import '../core/models/settings.dart';
+import '../core/models/task_item.dart';
 import '../core/models/timetable.dart';
 import 'store.dart';
 
@@ -27,6 +28,7 @@ class AppState extends ChangeNotifier {
   AppSettings get settings => _data.settings;
   Timetable? get activeTimetable => _data.activeTimetable;
   List<Exam> get exams => _data.exams;
+  List<TaskItem> get tasks => _data.tasks;
 
   Future<void> load() async {
     _data = await store.load();
@@ -61,7 +63,8 @@ class AppState extends ChangeNotifier {
   /// 挂件进程改设置项时走这条路：先把磁盘上的最新数据读回来，只替换设置再写回，
   /// 这样即使主窗口刚保存过课表编辑，也不会被挂件整份覆盖掉。
   Future<void> mutateSettingsSafely(
-      AppSettings Function(AppSettings) change) async {
+    AppSettings Function(AppSettings) change,
+  ) async {
     final fresh = await store.load();
     _data = fresh.copyWith(settings: change(fresh.settings));
     notifyListeners();
@@ -79,7 +82,8 @@ class AppState extends ChangeNotifier {
         final updated = change(current);
         return d.copyWith(
           timetables: [
-            for (final t in d.timetables) if (t.id == updated.id) updated else t,
+            for (final t in d.timetables)
+              if (t.id == updated.id) updated else t,
           ],
           activeTimetableId: updated.id,
         );
@@ -87,51 +91,90 @@ class AppState extends ChangeNotifier {
 
   /// 导入：整表替换（同 id 覆盖，新 id 追加）并设为当前课表。
   Future<void> putTimetable(Timetable timetable) => _mutate((d) {
-        final exists = d.timetables.any((t) => t.id == timetable.id);
-        return d.copyWith(
-          timetables: exists
-              ? [
-                  for (final t in d.timetables)
-                    if (t.id == timetable.id) timetable else t,
-                ]
-              : [...d.timetables, timetable],
-          activeTimetableId: timetable.id,
-        );
-      });
+    final exists = d.timetables.any((t) => t.id == timetable.id);
+    return d.copyWith(
+      timetables: exists
+          ? [
+              for (final t in d.timetables)
+                if (t.id == timetable.id) timetable else t,
+            ]
+          : [...d.timetables, timetable],
+      activeTimetableId: timetable.id,
+    );
+  });
 
   Future<void> deleteTimetable(String id) => _mutate((d) {
-        final rest = d.timetables.where((t) => t.id != id).toList();
-        if (rest.isEmpty) {
-          final fresh = AppData.initial();
-          return d.copyWith(
-            timetables: fresh.timetables,
-            activeTimetableId: fresh.activeTimetableId,
-          );
-        }
-        return d.copyWith(
-          timetables: rest,
-          activeTimetableId:
-              d.activeTimetableId == id ? rest.first.id : d.activeTimetableId,
-        );
-      });
+    final rest = d.timetables.where((t) => t.id != id).toList();
+    if (rest.isEmpty) {
+      final fresh = AppData.initial();
+      return d.copyWith(
+        timetables: fresh.timetables,
+        activeTimetableId: fresh.activeTimetableId,
+      );
+    }
+    return d.copyWith(
+      timetables: rest,
+      activeTimetableId: d.activeTimetableId == id
+          ? rest.first.id
+          : d.activeTimetableId,
+    );
+  });
 
   Future<void> putExam(Exam exam) => _mutate((d) {
-        final exists = d.exams.any((e) => e.id == exam.id);
-        return d.copyWith(
-          exams: exists
-              ? [for (final e in d.exams) if (e.id == exam.id) exam else e]
-              : [...d.exams, exam],
-        );
-      });
+    final exists = d.exams.any((e) => e.id == exam.id);
+    return d.copyWith(
+      exams: exists
+          ? [
+              for (final e in d.exams)
+                if (e.id == exam.id) exam else e,
+            ]
+          : [...d.exams, exam],
+    );
+  });
 
-  Future<void> deleteExam(String id) =>
-      _mutate((d) => d.copyWith(exams: d.exams.where((e) => e.id != id).toList()));
+  Future<void> deleteExam(String id) => _mutate(
+    (d) => d.copyWith(exams: d.exams.where((e) => e.id != id).toList()),
+  );
+
+  Future<void> putTask(TaskItem task) => _mutate((data) {
+    final exists = data.tasks.any((item) => item.id == task.id);
+    return data.copyWith(
+      tasks: exists
+          ? [
+              for (final item in data.tasks)
+                if (item.id == task.id) task else item,
+            ]
+          : [...data.tasks, task],
+    );
+  });
+
+  Future<void> setTaskCompleted(String id, bool completed, {DateTime? at}) =>
+      _mutate(
+        (data) => data.copyWith(
+          tasks: [
+            for (final task in data.tasks)
+              if (task.id == id)
+                task.withCompletion(completed, at: at)
+              else
+                task,
+          ],
+        ),
+      );
+
+  Future<void> deleteTask(String id) => _mutate(
+    (data) => data.copyWith(
+      tasks: data.tasks.where((task) => task.id != id).toList(),
+    ),
+  );
+
+  Future<void> replaceTasks(List<TaskItem> tasks) =>
+      _mutate((data) => data.copyWith(tasks: tasks));
 }
 
 /// 让子树能拿到 [AppState]，并在它变化时重建。
 class AppScope extends InheritedNotifier<AppState> {
   const AppScope({super.key, required AppState state, required super.child})
-      : super(notifier: state);
+    : super(notifier: state);
 
   static AppState of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();

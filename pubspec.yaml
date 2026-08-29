@@ -1,7 +1,7 @@
 name: desktile
 description: "DeskTile 课表岛 —— Windows 与 Android 跨平台课程表"
 publish_to: 'none'
-version: 1.1.2+4
+version: 1.2.2+7
 
 environment:
   sdk: ^3.13.1
@@ -30,8 +30,12 @@ dependencies:
   home_widget: 0.9.3
   flutter_timezone: 5.0.1
   workmanager: ^0.10.9
-  # Android 线上更新检查与 APK 下载
+  # Android / Windows 线上更新检查与安装包下载
   http: ^1.6.0
+  # Release 资产 SHA-256 完整性校验
+  crypto: ^3.0.7
+  # Windows 可执行文件版本读取
+  package_info_plus: ^10.2.1
 
 dev_dependencies:
   flutter_test:

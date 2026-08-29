@@ -1,5 +1,6 @@
 import '../week_math.dart';
 import 'course.dart';
+import 'schedule_change.dart';
 import 'time_slot.dart';
 
 /// 一张完整的课表：学期信息 + 作息 + 课程 + 上课时段。
@@ -15,6 +16,7 @@ class Timetable {
     this.showWeekend = true,
     this.courses = const [],
     this.sessions = const [],
+    this.scheduleChanges = const [],
   }) : termStart = mondayOf(termStart);
 
   final String id;
@@ -27,10 +29,18 @@ class Timetable {
   final bool showWeekend;
   final List<Course> courses;
   final List<CourseSession> sessions;
+  final List<ScheduleChange> scheduleChanges;
 
   Course? courseById(String id) {
     for (final c in courses) {
       if (c.id == id) return c;
+    }
+    return null;
+  }
+
+  CourseSession? sessionById(String id) {
+    for (final session in sessions) {
+      if (session.id == id) return session;
     }
     return null;
   }
@@ -42,8 +52,9 @@ class Timetable {
     return null;
   }
 
-  int get maxSection =>
-      timeSlots.isEmpty ? 0 : timeSlots.map((s) => s.index).reduce((a, b) => a > b ? a : b);
+  int get maxSection => timeSlots.isEmpty
+      ? 0
+      : timeSlots.map((s) => s.index).reduce((a, b) => a > b ? a : b);
 
   Timetable copyWith({
     String? name,
@@ -53,46 +64,52 @@ class Timetable {
     bool? showWeekend,
     List<Course>? courses,
     List<CourseSession>? sessions,
-  }) =>
-      Timetable(
-        id: id,
-        name: name ?? this.name,
-        termStart: termStart ?? this.termStart,
-        totalWeeks: totalWeeks ?? this.totalWeeks,
-        timeSlots: timeSlots ?? this.timeSlots,
-        showWeekend: showWeekend ?? this.showWeekend,
-        courses: courses ?? this.courses,
-        sessions: sessions ?? this.sessions,
-      );
+    List<ScheduleChange>? scheduleChanges,
+  }) => Timetable(
+    id: id,
+    name: name ?? this.name,
+    termStart: termStart ?? this.termStart,
+    totalWeeks: totalWeeks ?? this.totalWeeks,
+    timeSlots: timeSlots ?? this.timeSlots,
+    showWeekend: showWeekend ?? this.showWeekend,
+    courses: courses ?? this.courses,
+    sessions: sessions ?? this.sessions,
+    scheduleChanges: scheduleChanges ?? this.scheduleChanges,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'termStart': _dateText(termStart),
-        'totalWeeks': totalWeeks,
-        'timeSlots': timeSlots.map((s) => s.toJson()).toList(),
-        'showWeekend': showWeekend,
-        'courses': courses.map((c) => c.toJson()).toList(),
-        'sessions': sessions.map((s) => s.toJson()).toList(),
-      };
+    'id': id,
+    'name': name,
+    'termStart': _dateText(termStart),
+    'totalWeeks': totalWeeks,
+    'timeSlots': timeSlots.map((s) => s.toJson()).toList(),
+    'showWeekend': showWeekend,
+    'courses': courses.map((c) => c.toJson()).toList(),
+    'sessions': sessions.map((s) => s.toJson()).toList(),
+    'scheduleChanges': scheduleChanges.map((c) => c.toJson()).toList(),
+  };
 
   factory Timetable.fromJson(Map<String, dynamic> json) => Timetable(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        termStart: DateTime.parse(json['termStart'] as String),
-        totalWeeks: (json['totalWeeks'] as int?) ?? 20,
-        timeSlots: (json['timeSlots'] as List?)
-                ?.map((e) => TimeSlot.fromJson(e as Map<String, dynamic>))
-                .toList() ??
-            kDefaultTimeSlots,
-        showWeekend: (json['showWeekend'] as bool?) ?? true,
-        courses: (json['courses'] as List? ?? [])
-            .map((e) => Course.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        sessions: (json['sessions'] as List? ?? [])
-            .map((e) => CourseSession.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    termStart: DateTime.parse(json['termStart'] as String),
+    totalWeeks: (json['totalWeeks'] as int?) ?? 20,
+    timeSlots:
+        (json['timeSlots'] as List?)
+            ?.map((e) => TimeSlot.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        kDefaultTimeSlots,
+    showWeekend: (json['showWeekend'] as bool?) ?? true,
+    courses: (json['courses'] as List? ?? [])
+        .map((e) => Course.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    sessions: (json['sessions'] as List? ?? [])
+        .map((e) => CourseSession.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    scheduleChanges: (json['scheduleChanges'] as List? ?? [])
+        .map((e) => ScheduleChange.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
 }
 
 String _dateText(DateTime d) =>

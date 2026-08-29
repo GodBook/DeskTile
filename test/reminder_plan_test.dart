@@ -1,4 +1,5 @@
 import 'package:desktile/core/models/settings.dart';
+import 'package:desktile/core/models/schedule_change.dart';
 import 'package:desktile/core/reminder_plan.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -127,12 +128,48 @@ void main() {
       expect(list.map((r) => r.title), ['下节课：高等数学', '下节课：大学英语']);
       expect(list[1].fireAt, DateTime(2026, 9, 7, 9, 45));
     });
+
+    test('停课不再提醒，调课按新时间提醒', () {
+      final changed = t.copyWith(
+        scheduleChanges: [
+          ScheduleChange.cancellation(
+            id: 'cancel',
+            originalSessionId: 's1',
+            originalDate: DateTime(2026, 9, 7),
+          ),
+          ScheduleChange.reschedule(
+            id: 'move',
+            originalSessionId: 's2',
+            originalDate: DateTime(2026, 9, 7),
+            targetDate: DateTime(2026, 9, 8),
+            startSection: 3,
+            endSection: 4,
+            room: '新教室',
+          ),
+        ],
+      );
+      final list = buildReminders(
+        timetable: changed,
+        settings: const AppSettings(
+          reminderMode: ReminderMode.everyClass,
+          leadMinutes: 10,
+        ),
+        from: DateTime(2026, 9, 7),
+        daysAhead: 2,
+      );
+
+      expect(list.map((reminder) => reminder.title), ['下节课：线性代数', '下节课：大学英语']);
+      expect(list.last.fireAt, DateTime(2026, 9, 8, 9, 45));
+      expect(list.last.body, contains('新教室'));
+    });
   });
 
   group('通知 id', () {
     test('同样的输入得到同样的 id', () {
-      expect(reminderId(DateTime(2026, 9, 7), 's1'),
-          reminderId(DateTime(2026, 9, 7), 's1'));
+      expect(
+        reminderId(DateTime(2026, 9, 7), 's1'),
+        reminderId(DateTime(2026, 9, 7), 's1'),
+      );
     });
 
     test('不同日期或不同时段得到不同 id', () {

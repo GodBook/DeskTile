@@ -12,6 +12,7 @@ import '../../platform/autostart.dart';
 import '../../platform/notifications.dart';
 import '../../platform/single_instance.dart';
 import '../theme.dart';
+import 'windows_update_section.dart';
 
 @visibleForTesting
 bool shouldRequestAndroidReminderPermissions({
@@ -302,6 +303,7 @@ class _SettingsPageState extends State<SettingsPage> {
           const _AndroidWidgetSection(),
           const _AndroidUpdateSection(),
         ],
+        if (Platform.isWindows) const WindowsUpdateSection(),
         _Section(
           title: '启动与外观',
           children: [

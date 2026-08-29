@@ -6,6 +6,9 @@ import '../../core/week_math.dart';
 import '../../core/weeks_parser.dart';
 import '../../data/app_state.dart';
 import '../../data/store.dart';
+import 'schedule_change_editor.dart';
+
+enum _SessionEditorAction { temporaryChange }
 
 /// 打开课程时段编辑框。[session] 为空表示新增。
 Future<void> showSessionEditor(
@@ -18,7 +21,7 @@ Future<void> showSessionEditor(
   final state = AppScope.read(context);
   final timetable = state.activeTimetable;
   if (timetable == null) return;
-  await showDialog<void>(
+  final action = await showDialog<_SessionEditorAction>(
     context: context,
     builder: (context) => _SessionEditorDialog(
       timetable: timetable,
@@ -28,6 +31,9 @@ Future<void> showSessionEditor(
       currentWeek: week,
     ),
   );
+  if (action == _SessionEditorAction.temporaryChange && context.mounted) {
+    await showScheduleChangeEditor(context, week: week, sourceSession: session);
+  }
 }
 
 class _SessionEditorDialog extends StatefulWidget {
@@ -165,6 +171,11 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
 
       // 清掉没有任何时段的课程，避免编辑改名后留下孤儿。
       final used = sessions.map((s) => s.courseId).toSet();
+      used.addAll(
+        current.scheduleChanges
+            .where((change) => change.courseId != null)
+            .map((change) => change.courseId!),
+      );
       courses = courses.where((c) => used.contains(c.id)).toList();
 
       return current.copyWith(courses: courses, sessions: sessions);
@@ -177,9 +188,18 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
     final id = widget.session!.id;
     await state.updateActiveTimetable((current) {
       final sessions = current.sessions.where((s) => s.id != id).toList();
+      final scheduleChanges = current.scheduleChanges
+          .where((change) => change.originalSessionId != id)
+          .toList();
       final used = sessions.map((s) => s.courseId).toSet();
+      used.addAll(
+        scheduleChanges
+            .where((change) => change.courseId != null)
+            .map((change) => change.courseId!),
+      );
       return current.copyWith(
         sessions: sessions,
+        scheduleChanges: scheduleChanges,
         courses: current.courses.where((c) => used.contains(c.id)).toList(),
       );
     });
@@ -341,6 +361,23 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
+              if (isEditing &&
+                  widget.session!.activeInWeek(widget.currentWeek)) ...[
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 4),
+                OutlinedButton.icon(
+                  onPressed: () =>
+                      Navigator.of(context)
+                          .pop(_SessionEditorAction.temporaryChange),
+                  icon: const Icon(Icons.event_repeat, size: 18),
+                  label: Text(
+                    '临时调整 '
+                    '${dateOfWeekDay(t.termStart, widget.currentWeek, widget.session!.day).month}月'
+                    '${dateOfWeekDay(t.termStart, widget.currentWeek, widget.session!.day).day}日',
+                  ),
+                ),
+              ],
             ],
           ),
         ),

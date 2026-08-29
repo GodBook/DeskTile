@@ -44,10 +44,7 @@ class ImportExportPage extends StatelessWidget {
                   ext: '.yaml / .yml',
                   desc: 'CSES 课表交换格式（可与 ClassIsland 等互通）',
                 ),
-                const _FormatLine(
-                  ext: '.ics',
-                  desc: '日历文件，教务系统常见的导出格式',
-                ),
+                const _FormatLine(ext: '.ics', desc: '日历文件，教务系统常见的导出格式'),
                 const _FormatLine(
                   ext: '.json',
                   desc: '小爱课程表 courseInfos 结构，或本程序导出的备份',
@@ -122,14 +119,21 @@ class _FormatLine extends StatelessWidget {
         children: [
           SizedBox(
             width: 110,
-            child: Text(ext,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(fontFamily: 'Consolas', fontWeight: FontWeight.w600)),
+            child: Text(
+              ext,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontFamily: 'Consolas',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           Expanded(
-            child: Text(desc,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.outline)),
+            child: Text(
+              desc,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
+            ),
           ),
         ],
       ),
@@ -140,17 +144,19 @@ class _FormatLine extends StatelessWidget {
 /// 提前抓好 messenger 和主题色，避免 await 之后再碰 BuildContext。
 class _Toast {
   _Toast(BuildContext context)
-      : _messenger = ScaffoldMessenger.of(context),
-        _errorColor = Theme.of(context).colorScheme.error;
+    : _messenger = ScaffoldMessenger.of(context),
+      _errorColor = Theme.of(context).colorScheme.error;
 
   final ScaffoldMessengerState _messenger;
   final Color _errorColor;
 
   void show(String message, {bool error = false}) {
-    _messenger.showSnackBar(SnackBar(
-      content: Text(message),
-      backgroundColor: error ? _errorColor : null,
-    ));
+    _messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? _errorColor : null,
+      ),
+    );
   }
 }
 
@@ -210,15 +216,11 @@ Future<void> showImportPreview(
   required String fileName,
   required ImportedSchedule imported,
   required Timetable base,
-}) =>
-    showDialog<void>(
-      context: context,
-      builder: (context) => _ImportPreviewDialog(
-        fileName: fileName,
-        imported: imported,
-        base: base,
-      ),
-    );
+}) => showDialog<void>(
+  context: context,
+  builder: (context) =>
+      _ImportPreviewDialog(fileName: fileName, imported: imported, base: base),
+);
 
 class _ImportPreviewDialog extends StatefulWidget {
   const _ImportPreviewDialog({
@@ -261,9 +263,23 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
       timeSlots: widget.imported.timeSlots ?? widget.base.timeSlots,
     );
     await state.putTimetable(timetable);
+    final importedTasks = widget.imported.tasks;
+    if (importedTasks != null) {
+      final sourceTimetableId = widget.imported.sourceTimetable?.id;
+      await state.replaceTasks([
+        for (final task in importedTasks)
+          if (sourceTimetableId != null &&
+              task.timetableId == sourceTimetableId)
+            task.withTimetableId(timetable.id)
+          else
+            task,
+      ]);
+    }
     navigator.pop();
     toast.show(
-        '已导入 ${timetable.courses.length} 门课、${timetable.sessions.length} 个时段');
+      '已导入 ${timetable.courses.length} 门课、${timetable.sessions.length} 个时段'
+      '${importedTasks == null ? '' : '、${importedTasks.length} 项作业与待办'}',
+    );
   }
 
   @override
@@ -280,16 +296,24 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
             children: [
               Text(widget.fileName, style: theme.textTheme.bodySmall),
               const SizedBox(height: 10),
-              Text('解析到 ${imported.courseNames.length} 门课、'
-                  '${imported.sessionCount} 个上课时段'),
+              Text(
+                '解析到 ${imported.courseNames.length} 门课、'
+                '${imported.sessionCount} 个上课时段',
+              ),
+              if (imported.tasks != null) ...[
+                const SizedBox(height: 4),
+                Text('备份包含 ${imported.tasks!.length} 项作业与待办'),
+              ],
               const SizedBox(height: 14),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.event, size: 18),
-                      label: Text('第一周周一：'
-                          '${_termStart.month}月${_termStart.day}日'),
+                      label: Text(
+                        '第一周周一：'
+                        '${_termStart.month}月${_termStart.day}日',
+                      ),
                       onPressed: () async {
                         final picked = await showDatePicker(
                           context: context,
@@ -327,9 +351,12 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
               ),
               if (imported.warnings.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                Text('需要注意（${imported.warnings.length}）',
-                    style: theme.textTheme.labelLarge
-                        ?.copyWith(color: theme.colorScheme.error)),
+                Text(
+                  '需要注意（${imported.warnings.length}）',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 for (final w in imported.warnings)
                   Padding(
@@ -338,9 +365,13 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
                   ),
               ],
               const SizedBox(height: 12),
-              Text('导入会覆盖当前课表「${widget.base.name}」的全部课程。',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.error)),
+              Text(
+                '导入会覆盖当前课表「${widget.base.name}」的全部课程'
+                '${imported.tasks == null ? '' : '，并替换作业与待办列表'}。',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
             ],
           ),
         ),
@@ -356,7 +387,8 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
   }
 }
 
-const _csvTemplate = '课程名称,教师,教室,星期,节次,周次\n'
+const _csvTemplate =
+    '课程名称,教师,教室,星期,节次,周次\n'
     '高等数学A,张伟,教三-305,周一,1-2,1-16\n'
     '线性代数,王强,教三-208,周二,1-2,1-16单\n'
     '体育,刘洋,体育馆,周二,3-4,1-16双\n'
@@ -368,7 +400,12 @@ Future<void> _saveCsvTemplate(BuildContext context) async {
     final uri = await FilePicker.saveFile(
       fileName: 'DeskTile课表模板.csv',
       // 带 UTF-8 BOM，Excel 打开中文才不乱码。
-      bytes: Uint8List.fromList([0xEF, 0xBB, 0xBF, ...utf8.encode(_csvTemplate)]),
+      bytes: Uint8List.fromList([
+        0xEF,
+        0xBB,
+        0xBF,
+        ...utf8.encode(_csvTemplate),
+      ]),
       dialogTitle: '保存 CSV 模板',
       allowedExtensions: const ['csv'],
     );
@@ -382,7 +419,8 @@ Future<void> _exportBackup(BuildContext context) async {
   final toast = _Toast(context);
   final state = AppScope.read(context);
   try {
-    final json = const JsonEncoder.withIndent('  ').convert(state.data.toJson());
+    final json = const JsonEncoder.withIndent('  ')
+        .convert(state.data.toJson());
     final uri = await FilePicker.saveFile(
       fileName: 'DeskTile备份.json',
       bytes: Uint8List.fromList(utf8.encode(json)),
@@ -438,5 +476,3 @@ Future<void> _openDataFolder(BuildContext context) async {
     toast.show('打开失败：$e', error: true);
   }
 }
-
-

@@ -2,8 +2,8 @@
 
 跨 Windows 与 Android 的极简课程表。无广告、无账号、纯本地，冷启动即用。
 
-**当前版本：v1.1.2**。Windows 桌面挂件与 Android 手机界面、Glance 主屏小组件、
-精准课程提醒均已完成；141 个跨平台测试通过。
+**当前开发版本：v1.2.2**（现行稳定版为 v1.1.2）。Windows 桌面挂件与 Android
+手机界面、Glance 主屏小组件、精准课程提醒、双端线上更新及作业待办均已完成；170 个跨平台测试通过。
 
 > 接手开发请先读 **[HANDOVER.md](HANDOVER.md)** —— 环境坑、架构决策、文件职责、
 > 验证记录、Phase 2/3 落地步骤和排错手册都在那里。本文件只是使用向导。
@@ -12,30 +12,52 @@
 
 ## 下载
 
-前往 [v1.1.2 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.1.2)：
+当前稳定版前往 [v1.1.2 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.1.2)：
 
 - `DeskTile-v1.1.2-android.apk`：Android 安装包
 - `DeskTile-v1.1.2-android.aab`：应用商店上传包，不能直接安装
 - `DeskTile-v1.1.2-SHA256SUMS.txt`：安装包 SHA-256 校验值
 
+从 v1.2.1 起，同一 Release 还会提供
+`DeskTile-v<版本>-windows-x64-setup.exe` Windows 安装包及独立 SHA-256 文件。
+
 ## 已实现（Windows）
 
-- **周视图**：节次时间轴 + 周一~周日，今天所在列高亮，课程块按课名稳定配色
+- **周视图**：节次时间轴 + 周一~周日，今天所在列高亮，课程块按课名稳定配色；
+  支持 `Ctrl + 滚轮` 在 65%～250% 之间缩放课表
 - **单双周**：周次是一个集合，「每周 / 单周 / 双周 / 自定义（1-8,10,12-16）」走同一条路径；
   顶栏可以逐周切换并显示当前是单周还是双周
+- **临时调课 / 停课 / 补课**：打开某次常规课程可只调整当日安排；调课可改日期、节次和教室，
+  停课保留灰色删除线标记；工具栏按钮或空白格右键可添加一次性补课，冲突会即时提示
 - **桌面挂件**：无边框圆角卡片，贴在桌面上（不遮挡其它窗口），任意位置拖动、位置记忆，
   托盘常驻。显示「第 N 周 · 周几 · 单/双周 → 下一节（课名 + **教室** + 倒计时）→ 今日课程 →
   最近考试倒计时」，另有只显示下一节的迷你形态
 - **早八教室提醒**：每天第一节课前 N 分钟弹 Windows 通知，正文必带教室；
   可切换成「每节课都提醒」；「早八」判定阈值可调（拉到 24:00 就等于每天第一节都提醒）
 - **考试倒计时**：科目 / 时间 / 考场 / 座位，按开考时间排序，考完的自动折叠
+- **作业与待办**：支持课程关联、重要标记、截止日期与时间、备注、完成/恢复、编辑和删除；
+  自动按逾期、今天、接下来、无截止日期和已完成分组
 - **导入**：CSV、CSES v2 YAML、ICS、小爱课程表 `courseInfos` JSON，导入前先给解析预览和警告
-- **导出**：CSES v2 YAML（可被 ClassIsland 等读取）、完整备份 JSON
+- **导出**：CSES v2 YAML（可被 ClassIsland 等读取）、完整备份 JSON；备份包含作业与待办
 - **开机自启**：写 `HKCU\...\CurrentVersion\Run`，启动的是挂件模式，不需要管理员权限
+- **线上更新**：设置 → 应用更新可检查稳定版、显示发布说明、流式下载安装包并启动覆盖安装；
+  主窗口和挂件会由安装器关闭，课表数据仍保留在 `%APPDATA%`
+
+Windows 更新要求 Release 中包含 x64 Setup `.exe`，推荐命名为
+`DeskTile-v<版本>-windows-x64-setup.exe`。应用内启动时安装器覆盖当前程序目录；从发布页首次运行时，
+默认安装到当前用户的 `%LOCALAPPDATA%\Programs\DeskTile`，两种方式都不要求管理员权限。
+当前自动构建的安装包没有 Authenticode 代码签名，首次运行可能触发 SmartScreen；正式大规模分发前应配置证书签名。
+自建更新服务可通过 `--dart-define=DESKTILE_UPDATE_URL=https://你的更新服务地址` 注入；
+Windows 响应至少包含 `version`/`tag_name` 与 `windows_url`/`installer_url`，也可直接返回
+GitHub Release 的 `assets` 结构。所有更新元数据和安装包地址都必须使用 HTTPS。
+GitHub 返回资产 SHA-256 digest 时，客户端会在启动安装器前自动校验，摘要不一致的文件会被删除。
 
 ## 已实现（Android）
 
-- **手机界面**：底部四栏导航、系统安全区适配、课表双指缩放与平移、320px 窄屏编辑器
+- **手机界面**：底部五栏导航、系统安全区适配、课表双指缩放与平移、320px 窄屏编辑器
+- **作业与待办**：与 Windows 共用数据和界面，支持课程关联、重要程度、截止时间、分组筛选及完成状态
+- **临时调课 / 停课 / 补课**：与 Windows 共用数据和编辑器；长按空白格可直接添加补课，
+  临时安排会同步影响提醒和主屏小组件
 - **主屏小组件**：Jetpack Glance 展示周次、下一节、教室、今日剩余和最近考试
 - **即时刷新**：课程保存后约 300ms 更新小组件，后台每 30 分钟刷新
 - **精准提醒**：设备 IANA 时区、精准闹钟、锁屏待机调度，通知正文包含教室
@@ -74,6 +96,14 @@ tool/flutter-msvc.bat build windows --release
 
 产物：`build\windows\x64\runner\Release\desktile.exe`
 
+生成可供线上更新使用的 Inno Setup 安装包（需先安装 Inno Setup 6）：
+
+```powershell
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.2.2 installer\DeskTile.iss
+```
+
+产物：`dist\DeskTile-v1.2.2-windows-x64-setup.exe`
+
 两种运行模式（同一个 exe）：
 
 ```bash
@@ -100,10 +130,11 @@ D:\dev\flutter\bin\flutter.bat build apk --release
 D:\dev\flutter\bin\flutter.bat build appbundle --release
 ```
 
-### Android 自动发布
+### 跨平台自动发布
 
-仓库中的 `.github/workflows/android-release.yml` 会在推送匹配 `v*` 的 Git 标签时自动运行：
-先校验标签与 `pubspec.yaml` 版本一致，再执行测试、签名构建并创建/更新 GitHub Release。
+仓库中的 `.github/workflows/android-release.yml` 与 `.github/workflows/windows-release.yml`
+会在推送匹配 `v*` 的 Git 标签时自动运行：先校验标签与 `pubspec.yaml` 版本一致，再执行测试、
+构建并更新同一个 GitHub Release。两个工作流共用串行发布组，不会同时创建 Release。
 
 首次使用前，在仓库 Settings → Secrets and variables → Actions 中配置以下 Secrets：
 
@@ -112,15 +143,17 @@ D:\dev\flutter\bin\flutter.bat build appbundle --release
 - `ANDROID_KEY_ALIAS`：密钥别名（当前为 `desktile`）
 - `ANDROID_KEY_PASSWORD`：密钥口令
 
-以后发布只需递增 `pubspec.yaml` 的 `version`（例如 `1.1.3+5`），提交后执行：
+以后每新增一个独立功能，补丁版本与构建号都各递增 1；修复可按发布需要单独递增。
+提交后执行：
 
 ```powershell
-git tag v1.1.3
+git tag v1.2.2
 git push origin master
-git push origin v1.1.3
+git push origin v1.2.2
 ```
 
-工作流会上传 APK、AAB 和校验文件；Android 客户端会从最新 Release 检查到新 APK。
+工作流会上传 APK、AAB、Windows x64 Setup 和校验文件；客户端只选择本平台的安装包。
+Windows 工作流目前生成未签名安装器，不需要额外 Secret；Android 工作流仍依赖上面的四个签名 Secret。
 
 ## 数据
 
@@ -136,21 +169,23 @@ git push origin v1.1.3
 | `.csv` | 表头 `课程名称,教师,教室,星期,节次,周次`。星期认 `1..7` / `周三` / `星期三` / `Wed`；周次认 `1-16`、`1-16单`、`双`、`1-8,10,12-16`、全角逗号。模板见 `docs/示例课表.csv`，设置页也能直接导出模板 |
 | `.yaml` / `.yml` | [CSES v2](https://github.com/CSES-org/CSES)。它用「循环中的第几个工作日」定位课程，导入时会按 `cycle.spans` 还原成星期几 + 单双周；只支持 1 周和 2 周循环，更长的循环会明确报错而不是悄悄算错 |
 | `.ics` | 每次课一条 VEVENT 的日历文件。学期第一周周一按最早的事件推算，节次时间表按出现过的时间段推算；带 `RRULE` 的重复事件不展开，会在警告里说明 |
-| `.json` | 小爱课程表的 `{"courseInfos":[...]}` 结构（`sections` 支持 `[{section:1}]` 和 `[1]` 两种写法），或本程序导出的备份 |
+| `.json` | 小爱课程表的 `{"courseInfos":[...]}` 结构（`sections` 支持 `[{section:1}]` 和 `[1]` 两种写法），或本程序导出的完整备份；DeskTile 备份会保留临时调课、停课、补课、作业待办和内部关联 ID |
 
 导入是**整表覆盖**当前课表，确认前会先显示解析到多少门课、多少个时段以及全部警告。
+CSES/CSV/ICS 本身无法完整表达单次课程变更；需要跨端迁移临时安排时请使用 JSON 备份。
 
 ## 目录结构
 
 ```
 lib/
 ├─ core/                 纯 Dart，不依赖 Flutter，测试全覆盖
-│  ├─ models/            Timetable / Course / CourseSession / Exam / TimeSlot / AppSettings
+│  ├─ models/            Timetable / Course / CourseSession / ScheduleChange / TaskItem / Exam / TimeSlot / AppSettings
 │  ├─ week_math.dart     学期周次换算（UTC 归一化，不受时区影响）
 │  ├─ weeks_parser.dart  周次串解析与格式化（导入与未来教务解析共用）
-│  ├─ agenda.dart        某周某天的课、下一节、今日剩余
+│  ├─ agenda.dart        应用临时变更后的实际日程、下一节、今日剩余
 │  ├─ reminder_plan.dart 提醒计划（决定性 id + 含教室的正文）
 │  ├─ exam_countdown.dart
+│  ├─ task_query.dart    作业待办分组、排序与最近截止查询
 │  └─ import/            course_info_dto / csv / cses / ics / json / exporter
 ├─ data/                 app_data（纯数据）、store（原子 JSON 读写 + 文件监听）、app_state
 ├─ platform/             Windows 窗口/托盘与 Android 后台任务/小组件桥
@@ -168,7 +203,7 @@ tool/
 
 已实测通过：
 
-- `flutter analyze` 无任何问题；`flutter test` 141 个测试全绿
+- `flutter analyze` 无任何问题；`flutter test` 170 个测试全绿
 - Release 构建成功，主窗口与挂件都实际运行并截图确认
 - Android 正式签名 APK/AAB 构建成功；API 36 模拟器完成通知、小组件、重启恢复验收
 - 单双周：第 1 周显示单周课、第 2 周显示双周课，界面测试与真机截图双向确认

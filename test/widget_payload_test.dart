@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:desktile/core/widget_payload.dart';
 import 'package:desktile/core/models/course.dart';
 import 'package:desktile/core/models/exam.dart';
+import 'package:desktile/core/models/schedule_change.dart';
 import 'package:desktile/core/models/timetable.dart';
 
 void main() {
@@ -64,6 +65,25 @@ void main() {
     expect(payload.week, 0);
     expect(payload.weekday, 0);
     expect(payload.weekdayLabel, '学期外');
+    expect(payload.nextTitle, isEmpty);
+    expect(payload.remainingToday, 0);
+  });
+
+  test('停课后小组件不再显示该课程', () {
+    final changed = timetable.copyWith(
+      scheduleChanges: [
+        ScheduleChange.cancellation(
+          id: 'cancel',
+          originalSessionId: 's1',
+          originalDate: DateTime(2026, 8, 17),
+        ),
+      ],
+    );
+    final payload = buildWidgetPayload(
+      timetable: changed,
+      now: DateTime(2026, 8, 17, 7),
+    );
+
     expect(payload.nextTitle, isEmpty);
     expect(payload.remainingToday, 0);
   });

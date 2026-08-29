@@ -3,9 +3,13 @@ import 'dart:io';
 
 import 'package:desktile/core/import/course_info_dto.dart';
 import 'package:desktile/core/import/csv_importer.dart';
+import 'package:desktile/core/import/json_importer.dart';
 import 'package:desktile/core/models/course.dart';
 import 'package:desktile/core/models/exam.dart';
+import 'package:desktile/core/models/schedule_change.dart';
 import 'package:desktile/core/models/settings.dart';
+import 'package:desktile/core/models/task_item.dart';
+import 'package:desktile/core/models/timetable.dart';
 import 'package:desktile/core/week_math.dart';
 import 'package:desktile/data/app_state.dart';
 import 'package:desktile/data/store.dart';
@@ -14,10 +18,13 @@ import 'package:desktile/platform/notifications.dart';
 import 'package:desktile/ui/app.dart';
 import 'package:desktile/ui/pages/exams_page.dart';
 import 'package:desktile/ui/pages/import_export_page.dart';
+import 'package:desktile/ui/pages/tasks_page.dart';
 import 'package:desktile/ui/pages/timetable_page.dart';
 import 'package:desktile/ui/widget_app.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'helpers.dart';
@@ -29,6 +36,7 @@ import 'helpers.dart';
 Future<AppState> _makeState(
   WidgetTester tester, {
   List<Exam> exams = const [],
+  List<TaskItem> tasks = const [],
   AppSettings settings = const AppSettings(),
 }) async {
   late AppState state;
@@ -66,6 +74,7 @@ Future<AppState> _makeState(
         timetables: [withToday],
         activeTimetableId: 't1',
         exams: exams,
+        tasks: tasks,
         settings: settings,
       ),
     );
@@ -79,6 +88,28 @@ Widget _host(AppState state, Widget child) => AppScope(
   state: state,
   child: MaterialApp(home: Scaffold(body: child)),
 );
+
+Future<void> _pressAsyncButton(WidgetTester tester, Finder buttonFinder) async {
+  final callback = tester.widget<ButtonStyleButton>(buttonFinder).onPressed!;
+  await tester.runAsync(() async {
+    final result = (callback as dynamic)();
+    if (result is Future) await result;
+  });
+  await tester.pumpAndSettle();
+}
+
+Future<void> _changeCheckbox(
+  WidgetTester tester,
+  Finder checkboxFinder,
+  bool value,
+) async {
+  final callback = tester.widget<Checkbox>(checkboxFinder).onChanged!;
+  await tester.runAsync(() async {
+    final result = (callback as dynamic)(value);
+    if (result is Future) await result;
+  });
+  await tester.pumpAndSettle();
+}
 
 void main() {
   test('Android 通知小图标资源配置完整', () {
@@ -111,6 +142,9 @@ void main() {
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
     expect(tester.getTopLeft(find.text('测试课表')).dy, greaterThan(24));
+    await tester.tap(find.text('待办'));
+    await tester.pumpAndSettle();
+    expect(find.text('作业与待办'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -200,6 +234,86 @@ void main() {
     }
   });
 
+  testWidgets('Windows 周视图支持 Ctrl 加滚轮缩放，普通滚轮仍可滚动', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(900, 600);
+    addTearDown(tester.view.reset);
+
+    TestPointer? mouse;
+    var controlPressed = false;
+    try {
+      final state = await _makeState(tester);
+      await tester.pumpWidget(_host(state, const TimetablePage()));
+      await tester.pumpAndSettle();
+
+      const zoomKey = ValueKey('timetable-windows-body-zoom');
+      final verticalScroll = find.byKey(
+        const ValueKey('timetable-vertical-scroll'),
+      );
+      final scrollable = find.descendant(
+        of: verticalScroll,
+        matching: find.byType(Scrollable),
+      );
+      double currentScale() =>
+          tester.widget<Transform>(find.byKey(zoomKey)).transform.storage[0];
+
+      expect(currentScale(), 1);
+      final scrollableState = tester.state<ScrollableState>(scrollable);
+      expect(scrollableState.position.pixels, 0);
+
+      mouse = TestPointer(1, PointerDeviceKind.mouse);
+      final pointerLocation = tester.getCenter(verticalScroll);
+      await tester.sendEventToBinding(
+        mouse.addPointer(location: pointerLocation),
+      );
+      await tester.sendEventToBinding(mouse.hover(pointerLocation));
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      controlPressed = true;
+      await tester.sendEventToBinding(mouse.scroll(const Offset(0, -120)));
+      await tester.pump();
+
+      expect(currentScale(), closeTo(1.1, 0.001));
+      expect(scrollableState.position.pixels, 0);
+
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      controlPressed = false;
+      await tester.sendEventToBinding(mouse.scroll(const Offset(0, 120)));
+      await tester.pumpAndSettle();
+
+      expect(currentScale(), closeTo(1.1, 0.001));
+      expect(scrollableState.position.pixels, greaterThan(0));
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      controlPressed = true;
+      for (var i = 0; i < 30; i++) {
+        await tester.sendEventToBinding(mouse.scroll(const Offset(0, -120)));
+      }
+      await tester.pump();
+      expect(currentScale(), closeTo(2.5, 0.001));
+
+      for (var i = 0; i < 30; i++) {
+        await tester.sendEventToBinding(mouse.scroll(const Offset(0, 120)));
+      }
+      await tester.pump();
+      expect(currentScale(), closeTo(0.65, 0.001));
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      controlPressed = false;
+
+      expect(tester.takeException(), isNull);
+    } finally {
+      if (controlPressed) {
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      }
+      if (mouse != null) {
+        await tester.sendEventToBinding(mouse.removePointer());
+      }
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('周视图：单周课在第 1 周出现、第 2 周消失', (tester) async {
     final state = await _makeState(tester);
     await tester.pumpWidget(_host(state, const TimetablePage()));
@@ -214,6 +328,180 @@ void main() {
     expect(find.text('第 2 周 · 双周'), findsOneWidget);
     expect(find.text('线性代数'), findsNothing);
     expect(find.text('高等数学'), findsOneWidget, reason: '每周的课不受单双周影响');
+  });
+
+  testWidgets('临时停课：从常规课程创建后在周视图标记并写入磁盘', (tester) async {
+    final state = await _makeState(tester);
+    await tester.pumpWidget(_host(state, const TimetablePage()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('高等数学'));
+    await tester.pumpAndSettle();
+    final temporaryChange = find.textContaining('临时调整');
+    await tester.ensureVisible(temporaryChange);
+    await tester.tap(temporaryChange);
+    await tester.pumpAndSettle();
+
+    expect(find.text('调整本次课程'), findsOneWidget);
+    await tester.tap(find.text('停课'));
+    await tester.pump();
+    await _pressAsyncButton(tester, find.widgetWithText(FilledButton, '保存'));
+
+    expect(find.text('停课'), findsOneWidget);
+    final change = state.activeTimetable!.scheduleChanges.single;
+    expect(change.type, ScheduleChangeType.cancellation);
+    expect(change.originalSessionId, 's1');
+
+    late List<ScheduleChange> persistedChanges;
+    await tester.runAsync(() async {
+      persistedChanges =
+          (await state.store.load()).activeTimetable!.scheduleChanges;
+    });
+    expect(persistedChanges.single.type, ScheduleChangeType.cancellation);
+    expect(persistedChanges.single.originalSessionId, 's1');
+  });
+
+  testWidgets('临时补课：从工具栏添加、显示标记并可删除', (tester) async {
+    final state = await _makeState(tester);
+    await tester.pumpWidget(_host(state, const TimetablePage()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('添加补课'));
+    await tester.pumpAndSettle();
+    expect(find.text('添加补课'), findsOneWidget);
+
+    await _pressAsyncButton(tester, find.widgetWithText(FilledButton, '保存'));
+
+    expect(find.text('补课'), findsOneWidget);
+    final change = state.activeTimetable!.scheduleChanges.single;
+    expect(change.type, ScheduleChangeType.extraClass);
+    expect(change.courseId, 'c1');
+
+    await tester.tap(find.text('补课'));
+    await tester.pumpAndSettle();
+    expect(find.text('删除补课'), findsOneWidget);
+    await _pressAsyncButton(tester, find.widgetWithText(TextButton, '删除补课'));
+
+    expect(find.text('补课'), findsNothing);
+    expect(state.activeTimetable!.scheduleChanges, isEmpty);
+  });
+
+  testWidgets('作业待办页：320px 下工具栏、筛选和编辑器无溢出', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 700);
+    addTearDown(tester.view.reset);
+
+    final state = await _makeState(tester);
+    await tester.pumpWidget(_host(state, const TasksPage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('作业与待办'), findsOneWidget);
+    expect(find.text('待完成'), findsOneWidget);
+    expect(find.text('已完成'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '添加事项'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('添加事项'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('作业'), findsOneWidget);
+    expect(find.text('待办'), findsOneWidget);
+    expect(find.byKey(const ValueKey('task-title')), findsOneWidget);
+    expect(find.byKey(const ValueKey('task-due-date')), findsOneWidget);
+    expect(find.byKey(const ValueKey('task-due-time')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('作业待办页：新增课程作业、持久化、编辑并删除', (tester) async {
+    final state = await _makeState(tester);
+    await tester.pumpWidget(_host(state, const TasksPage()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, '添加事项'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('task-title')), '完成高数习题');
+    await tester.tap(find.byKey(const ValueKey('task-course')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('高等数学').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('标为重要'));
+    await tester.pump();
+    await _pressAsyncButton(tester, find.widgetWithText(FilledButton, '保存'));
+
+    expect(state.tasks, hasLength(1));
+    final taskId = state.tasks.single.id;
+    expect(state.tasks.single.title, '完成高数习题');
+    expect(state.tasks.single.kind, TaskKind.homework);
+    expect(state.tasks.single.courseId, 'c1');
+    expect(state.tasks.single.priority, TaskPriority.important);
+    expect(state.tasks.single.dueAt, isNotNull);
+    expect(find.text('1 项待完成'), findsOneWidget);
+    expect(find.text('完成高数习题'), findsOneWidget);
+    expect(find.text('高等数学'), findsOneWidget);
+
+    late List<TaskItem> persistedTasks;
+    await tester.runAsync(() async {
+      persistedTasks = (await state.store.load()).tasks;
+    });
+    expect(persistedTasks.single.title, '完成高数习题');
+
+    await tester.tap(find.byKey(ValueKey('task-row-$taskId')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('task-title')),
+      '完成高数第二章习题',
+    );
+    await _pressAsyncButton(tester, find.widgetWithText(FilledButton, '保存'));
+    expect(find.text('完成高数第二章习题'), findsOneWidget);
+
+    await tester.tap(find.byKey(ValueKey('task-row-$taskId')));
+    await tester.pumpAndSettle();
+    await _pressAsyncButton(tester, find.widgetWithText(TextButton, '删除'));
+    expect(state.tasks, isEmpty);
+    expect(find.text('完成高数第二章习题'), findsNothing);
+  });
+
+  testWidgets('作业待办页：完成和恢复会在筛选视图间移动', (tester) async {
+    final now = DateTime.now();
+    final state = await _makeState(
+      tester,
+      tasks: [
+        TaskItem(
+          id: 'task1',
+          title: '整理实验报告',
+          kind: TaskKind.todo,
+          createdAt: now,
+          dueAt: DateTime(now.year, now.month, now.day + 1, 18),
+        ),
+      ],
+    );
+    await tester.pumpWidget(_host(state, const TasksPage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('整理实验报告'), findsOneWidget);
+    await _changeCheckbox(
+      tester,
+      find.byKey(const ValueKey('task-checkbox-task1')),
+      true,
+    );
+    expect(state.tasks.single.isCompleted, isTrue);
+    expect(find.text('整理实验报告'), findsNothing);
+    expect(find.text('暂无待完成事项'), findsOneWidget);
+
+    await tester.tap(find.text('已完成'));
+    await tester.pumpAndSettle();
+    expect(find.text('整理实验报告'), findsOneWidget);
+    await _changeCheckbox(
+      tester,
+      find.byKey(const ValueKey('task-checkbox-task1')),
+      false,
+    );
+    expect(state.tasks.single.isCompleted, isFalse);
+    expect(find.text('整理实验报告'), findsNothing);
   });
 
   testWidgets('考试页：列出倒计时、考场和座位，考完的折叠起来', (tester) async {
@@ -284,7 +572,13 @@ void main() {
   });
 
   testWidgets('导入预览：确认后整表覆盖，课程数与警告都对', (tester) async {
-    final state = await _makeState(tester);
+    final existingTask = TaskItem(
+      id: 'existing-task',
+      title: '保留的待办',
+      kind: TaskKind.todo,
+      createdAt: DateTime(2026, 8, 28),
+    );
+    final state = await _makeState(tester, tasks: [existingTask]);
     late ImportedSchedule imported;
     await tester.runAsync(() async {
       final csv = utf8.decode(File('docs/示例课表.csv').readAsBytesSync());
@@ -325,5 +619,92 @@ void main() {
     expect(t.courses.length, 8);
     expect(t.sessions.length, 9);
     expect(t.courses.map((c) => c.name), contains('高等数学A'));
+    expect(state.tasks.single.id, 'existing-task');
+    expect(state.tasks.single.title, '保留的待办');
+  });
+
+  testWidgets('导入预览：完整备份替换任务并重绑到当前课表', (tester) async {
+    final state = await _makeState(
+      tester,
+      tasks: [
+        TaskItem(
+          id: 'old-task',
+          title: '应被替换的待办',
+          kind: TaskKind.todo,
+          createdAt: DateTime(2026, 8, 28),
+        ),
+      ],
+    );
+    final original = buildTestTimetable(termStart: mondayOf(DateTime.now()));
+    final backupTimetable = Timetable(
+      id: 'backup-table',
+      name: '备份课表',
+      termStart: original.termStart,
+      totalWeeks: original.totalWeeks,
+      timeSlots: original.timeSlots,
+      showWeekend: original.showWeekend,
+      courses: original.courses,
+      sessions: original.sessions,
+      scheduleChanges: original.scheduleChanges,
+    );
+    final backupTask = TaskItem(
+      id: 'backup-task',
+      title: '备份里的高数作业',
+      kind: TaskKind.homework,
+      createdAt: DateTime(2026, 8, 29, 9),
+      dueAt: DateTime(2026, 8, 30, 20),
+      timetableId: backupTimetable.id,
+      courseId: 'c1',
+      priority: TaskPriority.important,
+    );
+    final imported = importCourseInfosJson(
+      jsonEncode({
+        'schemaVersion': 3,
+        'activeTimetableId': backupTimetable.id,
+        'timetables': [backupTimetable.toJson()],
+        'exams': const [],
+        'tasks': [backupTask.toJson()],
+        'settings': const {},
+      }),
+    );
+
+    await tester.pumpWidget(
+      _host(
+        state,
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showImportPreview(
+              context,
+              fileName: 'DeskTile-backup.json',
+              imported: imported,
+              base: state.activeTimetable!,
+            ),
+            child: const Text('打开备份预览'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('打开备份预览'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('备份包含 1 项作业与待办'), findsOneWidget);
+    expect(find.textContaining('并替换作业与待办列表'), findsOneWidget);
+
+    await _pressAsyncButton(tester, find.widgetWithText(FilledButton, '导入并覆盖'));
+
+    expect(state.tasks, hasLength(1));
+    expect(state.tasks.single.id, 'backup-task');
+    expect(state.tasks.single.title, '备份里的高数作业');
+    expect(state.tasks.single.timetableId, state.activeTimetable!.id);
+    expect(state.tasks.single.timetableId, 't1');
+    expect(state.tasks.single.courseId, 'c1');
+    expect(state.tasks.single.priority, TaskPriority.important);
+
+    late List<TaskItem> persistedTasks;
+    await tester.runAsync(() async {
+      persistedTasks = (await state.store.load()).tasks;
+    });
+    expect(persistedTasks.single.id, 'backup-task');
+    expect(persistedTasks.single.timetableId, 't1');
   });
 }

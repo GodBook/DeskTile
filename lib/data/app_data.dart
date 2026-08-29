@@ -1,5 +1,6 @@
 import '../core/models/exam.dart';
 import '../core/models/settings.dart';
+import '../core/models/task_item.dart';
 import '../core/models/timetable.dart';
 import '../core/week_math.dart';
 
@@ -15,14 +16,16 @@ class AppData {
     required this.exams,
     required this.settings,
     this.activeTimetableId,
+    this.tasks = const [],
   });
 
   final List<Timetable> timetables;
   final List<Exam> exams;
   final AppSettings settings;
   final String? activeTimetableId;
+  final List<TaskItem> tasks;
 
-  static const schemaVersion = 1;
+  static const schemaVersion = 3;
 
   Timetable? get activeTimetable {
     if (timetables.isEmpty) return null;
@@ -37,34 +40,39 @@ class AppData {
     List<Exam>? exams,
     AppSettings? settings,
     String? activeTimetableId,
-  }) =>
-      AppData(
-        timetables: timetables ?? this.timetables,
-        exams: exams ?? this.exams,
-        settings: settings ?? this.settings,
-        activeTimetableId: activeTimetableId ?? this.activeTimetableId,
-      );
+    List<TaskItem>? tasks,
+  }) => AppData(
+    timetables: timetables ?? this.timetables,
+    exams: exams ?? this.exams,
+    settings: settings ?? this.settings,
+    activeTimetableId: activeTimetableId ?? this.activeTimetableId,
+    tasks: tasks ?? this.tasks,
+  );
 
   Map<String, dynamic> toJson() => {
-        'schemaVersion': schemaVersion,
-        'activeTimetableId': activeTimetableId,
-        'timetables': timetables.map((t) => t.toJson()).toList(),
-        'exams': exams.map((e) => e.toJson()).toList(),
-        'settings': settings.toJson(),
-      };
+    'schemaVersion': schemaVersion,
+    'activeTimetableId': activeTimetableId,
+    'timetables': timetables.map((t) => t.toJson()).toList(),
+    'exams': exams.map((e) => e.toJson()).toList(),
+    'tasks': tasks.map((task) => task.toJson()).toList(),
+    'settings': settings.toJson(),
+  };
 
   factory AppData.fromJson(Map<String, dynamic> json) => AppData(
-        activeTimetableId: json['activeTimetableId'] as String?,
-        timetables: (json['timetables'] as List? ?? [])
-            .map((e) => Timetable.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        exams: (json['exams'] as List? ?? [])
-            .map((e) => Exam.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        settings: json['settings'] is Map<String, dynamic>
-            ? AppSettings.fromJson(json['settings'] as Map<String, dynamic>)
-            : const AppSettings(),
-      );
+    activeTimetableId: json['activeTimetableId'] as String?,
+    timetables: (json['timetables'] as List? ?? [])
+        .map((e) => Timetable.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    exams: (json['exams'] as List? ?? [])
+        .map((e) => Exam.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    tasks: (json['tasks'] as List? ?? [])
+        .map((e) => TaskItem.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    settings: json['settings'] is Map<String, dynamic>
+        ? AppSettings.fromJson(json['settings'] as Map<String, dynamic>)
+        : const AppSettings(),
+  );
 
   /// 首次运行：给一张空课表，学期从本周周一算起，界面立刻有东西可看。
   factory AppData.initial({DateTime? now}) {
@@ -73,6 +81,7 @@ class AppData {
     return AppData(
       timetables: [t],
       exams: const [],
+      tasks: const [],
       settings: const AppSettings(),
       activeTimetableId: t.id,
     );

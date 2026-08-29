@@ -1,0 +1,89 @@
+name: Windows Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  # 与 Android 工作流共用串行组，避免同时创建同一个 Release。
+  group: desktile-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      FLUTTER_VERSION: '3.47.1'
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Validate tag and app version
+        shell: pwsh
+        run: |
+          $tagVersion = $env:GITHUB_REF_NAME.Substring(1)
+          $appVersion = (Select-String -Path pubspec.yaml -Pattern '^version:\s*([^+\s]+)' | Select-Object -First 1).Matches.Groups[1].Value
+          if ([string]::IsNullOrWhiteSpace($appVersion) -or $tagVersion -ne $appVersion) {
+            throw "Tag $env:GITHUB_REF_NAME does not match pubspec version $appVersion"
+          }
+          "APP_VERSION=$appVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Test and build Windows package
+        shell: pwsh
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build windows --release
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
+      - name: Build installer and checksum
+        shell: pwsh
+        run: |
+          $isccCommand = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+          $iscc = if ($isccCommand) { $isccCommand.Source } else { $null }
+          if (-not $iscc) {
+            $iscc = @(
+              (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'),
+              (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe')
+            ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $iscc -or -not (Test-Path $iscc)) {
+            throw "Inno Setup compiler not found"
+          }
+          & $iscc "/DAppVersion=$env:APP_VERSION" installer\DeskTile.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $hash = (Get-FileHash "dist\DeskTile-v$env:APP_VERSION-windows-x64-setup.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  DeskTile-v$env:APP_VERSION-windows-x64-setup.exe" | Set-Content "dist\DeskTile-v$env:APP_VERSION-windows-SHA256SUMS.txt" -Encoding ascii
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --title "DeskTile 课表岛 $tag" --generate-notes
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          $assets = Get-ChildItem dist -File | ForEach-Object FullName
+          gh release upload $tag @assets --repo $env:GITHUB_REPOSITORY --clobber
