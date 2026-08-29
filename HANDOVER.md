@@ -2,22 +2,23 @@
 
 > 最后更新：2026-08-29 · 当前状态：Phase 1（Windows）完成 + Phase 2（Android）完成
 > 代码位置：`D:\CLAUDE\DeskTile`（原中文目录 `D:\CLAUDE\DeskTile课表岛` 未使用，见 §1.2）
-> 仓库：https://github.com/GodBook/DeskTile （公开）· 当前发布与源码版本：`v1.2.2`
-> 规模：`lib/` 50 个文件，`test/` 16 个文件 / 170 个用例
+> 仓库：https://github.com/GodBook/DeskTile （公开）· 当前发布与源码版本：`v1.2.3`
+> 规模：`lib/` 50 个文件，`test/` 16 个文件 / 170 个 Flutter 用例 + 3 个 Android 原生用例
 
 ---
 
 ## 0. 现状一句话
 
-**Windows 端**功能完整、Release 构建通过、170 个跨平台测试全绿、实机跑过并截图；
+**Windows 端**功能完整、Release 构建通过、170 个 Flutter 测试全绿、实机跑过并截图；
 唯一已知缺陷是 Toast 弹窗在本机 Windows 11 26200 上不显示（排定逻辑正确，见 §8）。
 
 **Android 端 Phase 2 已完成**：单 Activity 手机界面、Jetpack Glance 主屏小组件、
 30 分钟后台刷新、IANA 本地时区精准提醒、每日重排和开机恢复均已落地。
 API 36 模拟器已验证小组件即时刷新、10 秒通知、精准闹钟、重启恢复和原生应用详情入口；
-`v1.2.2` Release 已提供正式签名 APK、AAB、Windows x64 Setup 和校验文件；本版补齐 Windows
+`v1.2.3` Release 提供正式签名 APK、AAB、Windows x64 Setup 和校验文件；此前已补齐 Windows
 应用内更新、x64 Setup、自动发布、课表 `Ctrl + 滚轮` 缩放，以及双端共用的
-临时调课 / 停课 / 补课和作业待办。
+临时调课 / 停课 / 补课和作业待办。本版将 Android 更新改为 `PackageInstaller Session`，
+修复部分 ROM 把 APK 交给文件管理器后提示“打开目标文件夹失败”的问题。
 
 **下次接手的第一件事**：继续做 §10.5 的国产 ROM 真机后台可靠性验证并确定 Play App Signing。
 
@@ -30,12 +31,12 @@ API 36 模拟器已验证小组件即时刷新、10 秒通知、精准闹钟、�
 | git 仓库 | 已建（`master` 分支，已配置 GitHub 远端） |
 | 远端 | `git@github.com:GodBook/DeskTile.git`（**SSH，不是 HTTPS**，原因见下） |
 | 提交身份 | 仓库级占位身份 `DeskTile Dev <dev@localhost>`，**全局 git config 未被改动** |
-| 标签 | `v1.0.0`（Windows 首发）、`v1.1.0`（Android Phase 2）、`v1.1.1`（线上更新与课表缩放）、`v1.1.2`（安装器兼容性修复）、`v1.2.2`（Windows 更新、临时课程变更、作业待办） |
-| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.2.2 · Android APK/AAB、Windows x64 Setup 与校验文件 |
-| 当前源码 | `1.2.2+7`；已创建 `v1.2.2` 标签，Android/Windows 发布工作流均成功 |
+| 标签 | `v1.0.0`（Windows 首发）、`v1.1.0`（Android Phase 2）、`v1.1.1`（线上更新与课表缩放）、`v1.1.2`（安装器兼容性修复）、`v1.2.2`（Windows 更新、临时课程变更、作业待办）、`v1.2.3`（Android 系统安装会话修复） |
+| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.2.3 · Android APK/AAB、Windows x64 Setup 与校验文件 |
+| 当前源码 | `1.2.3+8`；`v1.2.3` 通过 Android/Windows 发布工作流构建 |
 
 版本规则：以后每新增一个独立功能，补丁版本加 1、构建号也加 1。例如下一项新功能从
-`1.2.2+7` 迭代到 `1.2.3+8`；修复版本按实际发布需要单独递增。
+`1.2.3+8` 迭代到 `1.2.4+9`；修复版本按实际发布需要单独递增。
 
 **为什么 remote 是 SSH**：本机 `github.com:443` 被墙（20 秒超时），
 但 `github.com:22` 和 `ssh.github.com:443` 都通，`~/.ssh/id_ed25519` 也早就绑好了
@@ -150,7 +151,7 @@ Dart 代码在 `data\app.so`，插件 DLL 和 `data\flutter_assets\` 都要带�
 
 ```powershell
 & 'C:\Users\awxds\Documents\SuperMemo\.tools\InnoSetup\ISCC.exe' `
-  /DAppVersion=1.2.2 installer\DeskTile.iss
+  /DAppVersion=1.2.3 installer\DeskTile.iss
 ```
 
 Android 构建固定使用以下环境（PowerShell）：
@@ -239,7 +240,8 @@ Android 依赖方面，`maven.google.com` 在本机仍会超时，但 `google()`
 - **课程提醒**：设备 IANA 时区 + `exactAllowWhileIdle`，每天本地 00:05 重排未来 7 天
 - **系统恢复**：通知插件 receiver 恢复开机前闹钟，WorkManager 与 Glance 实例在重启后保留
 - **权限与引导**：只在用户明确开启/重排/测试提醒时请求权限；设置页可打开系统应用详情
-- **应用内更新**：设置页可查询 GitHub Release、流式下载 APK，并通过 `FileProvider` 调起系统安装器原地升级
+- **应用内更新**：设置页可查询 GitHub Release、流式下载 APK，并写入 `PackageInstaller Session`；
+  系统回调用户确认界面，不再把应用私有缓存交给文件管理器
 - **跨端数据**：沿用备份 JSON 导入导出，无需新增 Android 专用数据格式
 
 ### 2.3 明确不做（当时和需求方确认过的）
@@ -254,7 +256,7 @@ Android 依赖方面，`maven.google.com` 在本机仍会超时，但 `google()`
 | 教务系统直连（登录 + 抓课表） | Phase 3，见 §11。解析通路已预留 |
 | 多张课表切换 | 数据结构支持（`timetables` 是数组、有 `activeTimetableId`），界面没做入口 |
 | 常规课程冲突提示 | 临时调课 / 补课已提示冲突；常规重复课程编辑器尚未接冲突提示 |
-| Android 发布准备 | `v1.2.2` 正式 APK/AAB 已发布；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
+| Android 发布准备 | `v1.2.3` 正式 APK/AAB 已发布；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
 
 ---
 
@@ -628,7 +630,7 @@ CSES 无法表达单次变更，导出会明确警告并建议改用 JSON，而�
 
 ## 7. 测试
 
-### 7.1 清单（170 个用例）
+### 7.1 清单（170 个 Flutter 用例 + 3 个 Android 原生用例）
 
 | 文件 | 用例 | 覆盖什么 |
 |---|---|---|
@@ -647,6 +649,7 @@ CSES 无法表达单次变更，导出会明确警告并建议改用 JSON，而�
 | `reminder_permission_policy_test.dart` | 5 | Android 权限只在开启提醒或明确重新排定时请求，普通设置和非 Android 不请求 |
 | `android_update_test.dart` | 6 | 版本比较、Release APK 筛选、降级拦截、完整下载与 HTTPS 校验 |
 | `windows_update_test.dart` | 6 | 安装目录参数、设置页入口、x64 Setup 筛选、PE 文件头、临时文件清理与 SHA-256 拦截 |
+| `UpdateInstallReceiverTest.kt` | 3 | 系统安装会话待确认、成功与失败状态分类 |
 
 `docs/示例课表.csv` 和 `docs/示例课表.cses.yaml` 既是用户模板也是测试 fixture，
 改动它们会影响 `import_test` / `cses_test` 的断言。
@@ -676,8 +679,9 @@ CSES 无法表达单次变更，导出会明确警告并建议改用 JSON，而�
 |---|---|---|
 | 静态检查 | `flutter analyze` | 0 问题（含 lint info） |
 | 单元/界面测试 | `tool\flutter-msvc.bat test` | 170/170 通过 |
-| Windows Release | `tool\flutter-msvc.bat build windows --release` | `1.2.2+7` 构建成功；进程 5 秒保持响应，实际加载 `flutter_timezone_plugin.dll` |
-| Windows Setup | Inno Setup 6.7.3 编译 + PE/版本/哈希检查 | 11,295,060 字节；产品版本 `1.2.2`；SHA-256 `239bd080…7bffb67b` |
+| Android 原生测试 | `gradlew :app:testDebugUnitTest` | 3/3 通过；覆盖安装会话回调状态分类 |
+| Windows Release | `tool\flutter-msvc.bat build windows --release` | `1.2.3+8` 构建成功；PE 文件/产品版本均为 `1.2.3+8` |
+| Windows Setup | Inno Setup 6.7.3 编译 + PE/版本/哈希检查 | 11,295,207 字节；产品版本 `1.2.3`；SHA-256 `b973cde9…f4573` |
 | 主窗口渲染 | 灌示例数据后实机运行，`PrintWindow` 抓窗口 | 见 `docs/screenshots/主窗口-周视图.png` |
 | 挂件渲染 | 同上 | 见 `docs/screenshots/桌面挂件.png` |
 | 单双周（第 1 周） | 实机 + 界面测试 | 周二 1-2 节是线性代数（单周） |
@@ -688,7 +692,9 @@ CSES 无法表达单次变更，导出会明确警告并建议改用 JSON，而�
 | CSES 导出正确性 | 导出后用官方 `cses.schema.json`（draft-07）+ `jsonschema` 校验 | PASS；`docs/示例课表.cses.yaml` 也 PASS |
 | CSES 往返 | `cses_test.dart` | 导出再导入，星期/周次/节次数量一致 |
 | Android Debug 构建 | 专用 `GRADLE_USER_HOME` + `flutter build apk --debug` | 成功，APK 约 180 MB，可覆盖安装到 API 36 模拟器 |
-| Android Release 签名 | `flutter build apk --release` + `aapt` / `apksigner` | APK 59,356,086 字节（Flutter 显示 56.6 MB），`1.2.2+7`、target API 36、APK v2 通过；SHA-256 `d1e66a1f…e0356260` |
+| Android Release 签名 | `flutter build apk --release` + `aapt` / `apksigner` | APK 59,355,638 字节（Flutter 显示 56.6 MB），`1.2.3+8`、target API 36、APK v2 通过；SHA-256 `86dbfa14…0173` |
+| Android AAB | `flutter build appbundle --release` + `jarsigner -verify` | AAB 57,562,443 字节，签名通过；SHA-256 `7511a59f…4395` |
+| Android 升级签名连续性 | 对比 `v1.2.2` 与本地 `v1.2.3` APK 证书 | SHA-256 同为 `6cf11122…7b0c`，允许覆盖安装 |
 | 正式应用图标 | SVG 母版 + Android adaptive/monochrome/legacy + Windows ICO | 已替换 Flutter 默认图标；通知使用独立单色小图标 |
 | Android 手机布局 | Pixel 6 API 36 竖屏 + widget tests | 底部导航、安全区、课表双指缩放/平移、窄屏编辑器均无溢出；见 `docs/screenshots/Android-主界面.png` |
 | Glance 小组件 | Pixel Launcher 添加组件并修改课程 | Provider/实例正常；`RefreshTest / A101` 保存后约 300ms 即时更新，见 `Android-小组件*.png` |
@@ -864,6 +870,7 @@ GitHub 上有大量按这个约定写好的各校解析器（正方新旧版、�
 | **提醒不弹** | **① 先在设置页点「10 秒后测试提醒」，观察按钮下方有没有闪过 SnackBar 提示** ② 如果没有提示或提示里有错误，看日志里的 `lastError` ③ 系统设置里「通知」总开关和本应用开关是否都开 ④ 焦点助手是否启用（Win+A 快捷中心右下角） ⑤ `Get-Service WpnService` 是否 Running ⑥ 如果上述都正常但仍不弹，已知 Windows 11 26200 上 flutter_local_notifications_windows 3.1.1 有兼容性问题（见 §8 已知缺陷），考虑降级插件或换用 win_toast |
 | Android 提醒模拟器正常、真机失效 | 在设置页“后台可靠性”打开应用详情，允许后台运行；再按 ROM 设置自启动白名单、关闭不受控省电。见 §10.5 |
 | Android 测试提醒报 `invalid_icon` | 初始化参数必须是裸资源名 `ic_notification`，不能写 `@drawable/ic_notification`；同时确认 `res/raw/keep.xml` 保留该 drawable。 |
+| Android 更新提示“打开目标文件夹失败” | `v1.1.2`～`v1.2.2` 的 `ACTION_VIEW` 回退被部分 ROM 文件管理器接管，但文件管理器不能浏览应用私有缓存。手动安装一次 `v1.2.3`；此版本起改用 `PackageInstaller Session`。 |
 | 挂件看不见 | 它是 `alwaysOnBottom`，被其它窗口盖住了。点托盘图标会 `show()`；或者在设置里关掉「贴在桌面上」改成置顶 |
 | 挂件位置乱了 | 删掉数据目录里的 `widget_pos.json`，下次启动回到主屏右下角 |
 | 双击图标没反应 | 单实例机制：已有同模式实例在跑，它会把已有窗口叫到前面。挂件被隐藏时表现为「没反应」，点托盘图标即可 |

@@ -12,15 +12,6 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round">
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/desktile_file_paths" />
-        </provider>
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -43,6 +34,11 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- PackageInstaller 会话状态与用户确认回调，仅允许系统通过 PendingIntent 触发。 -->
+        <receiver
+            android:name=".UpdateInstallReceiver"
+            android:exported="false" />
 
         <!-- Android home-screen course widget (Jetpack Glance). -->
         <receiver

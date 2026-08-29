@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 更新 APK 始终写入应用私有 cache，不能暴露其它文件。 -->
-    <cache-path name="updates" path="desktile_updates/" />
-</paths>

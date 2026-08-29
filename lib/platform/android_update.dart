@@ -8,7 +8,7 @@ import 'release_update.dart';
 const defaultAndroidUpdateUrl = defaultReleaseUpdateUrl;
 
 // 与 pubspec.yaml 保持同步，供测试环境或旧版本原生通道缺失时回退。
-const defaultAndroidVersion = '1.2.2';
+const defaultAndroidVersion = '1.2.3';
 
 const _updateChannel = MethodChannel('com.desktile.desktile/app_update');
 
@@ -145,8 +145,7 @@ class AndroidUpdateService {
       };
     } on PlatformException catch (error) {
       final message = switch (error.code) {
-        'INSTALLER_START_FAILED' => '系统没有可用的 APK 安装器，请尝试用文件管理器打开更新包',
-        'APK_URI_FAILED' => '无法读取更新文件，请重新下载',
+        'INSTALLER_START_FAILED' => '无法创建系统安装会话，请重新尝试更新',
         'APK_NOT_FOUND' => '更新文件已失效，请重新下载',
         'UNKNOWN_SOURCE_SETTINGS_FAILED' => '无法打开“安装未知应用”设置，请到系统设置中授权',
         _ => error.message ?? '系统安装器启动失败',

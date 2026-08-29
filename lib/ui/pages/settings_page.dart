@@ -568,7 +568,7 @@ class _AndroidUpdateSectionState extends State<_AndroidUpdateSection> {
         );
       } else {
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('系统安装器已打开，请确认升级')));
+            .showSnackBar(const SnackBar(content: Text('安装包已提交，请在系统界面确认升级')));
       }
     } on AndroidUpdateException catch (error) {
       if (mounted) setState(() => _error = error.message);

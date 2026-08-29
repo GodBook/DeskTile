@@ -2,8 +2,9 @@
 
 跨 Windows 与 Android 的极简课程表。无广告、无账号、纯本地，冷启动即用。
 
-**当前稳定版本：v1.2.2**。Windows 桌面挂件与 Android
-手机界面、Glance 主屏小组件、精准课程提醒、双端线上更新及作业待办均已完成；170 个跨平台测试通过。
+**当前稳定版本：v1.2.3**。Windows 桌面挂件与 Android
+手机界面、Glance 主屏小组件、精准课程提醒、双端线上更新及作业待办均已完成；
+170 个 Flutter 测试和 3 个 Android 原生测试通过。
 
 > 接手开发请先读 **[HANDOVER.md](HANDOVER.md)** —— 环境坑、架构决策、文件职责、
 > 验证记录、Phase 2/3 落地步骤和排错手册都在那里。本文件只是使用向导。
@@ -12,12 +13,12 @@
 
 ## 下载
 
-当前稳定版前往 [v1.2.2 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.2.2)：
+当前稳定版前往 [v1.2.3 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.2.3)：
 
-- `DeskTile-v1.2.2-android.apk`：Android 安装包
-- `DeskTile-v1.2.2-android.aab`：应用商店上传包，不能直接安装
-- `DeskTile-v1.2.2-windows-x64-setup.exe`：Windows x64 安装包
-- `DeskTile-v1.2.2-SHA256SUMS.txt`、`DeskTile-v1.2.2-windows-SHA256SUMS.txt`：安装包校验值
+- `DeskTile-v1.2.3-android.apk`：Android 安装包
+- `DeskTile-v1.2.3-android.aab`：应用商店上传包，不能直接安装
+- `DeskTile-v1.2.3-windows-x64-setup.exe`：Windows x64 安装包
+- `DeskTile-v1.2.3-SHA256SUMS.txt`、`DeskTile-v1.2.3-windows-SHA256SUMS.txt`：安装包校验值
 
 ## 已实现（Windows）
 
@@ -61,7 +62,8 @@ GitHub 返回资产 SHA-256 digest 时，客户端会在启动安装器前自动
 - **精准提醒**：设备 IANA 时区、精准闹钟、锁屏待机调度，通知正文包含教室
 - **系统恢复**：重启后恢复通知计划、WorkManager 周期任务和 Glance 实例
 - **后台引导**：设置页可直达应用详情，便于国产 ROM 配置自启动和省电白名单
-- **线上更新**：设置 → 应用更新可检查 GitHub Release，下载 Android APK 后调用系统安装器原地升级，课表数据不会丢失
+- **线上更新**：设置 → 应用更新可检查 GitHub Release，下载 Android APK 后写入系统 `PackageInstaller`
+  安装会话并原地升级，课表数据不会丢失
 
 应用内更新要求新 APK 与当前安装包使用相同的 `applicationId`（`com.desktile.desktile`）和
 发布签名密钥，并且 Release 中包含 `.apk` 资产（推荐命名为
@@ -73,8 +75,9 @@ Android 可能要求在系统设置中允许 DeskTile 安装未知应用，授�
 请改用无需登录的更新服务或静态镜像。
 这条链路面向 GitHub/APK 直装分发；若以后只通过 Google Play 发布，应改用 Play 的应用内更新接口，
 不要继续依赖“未知来源安装”权限。
-`v1.1.2` 已包含课表双指缩放和应用内更新功能，并兼容未注册
-`ACTION_INSTALL_PACKAGE` 的 Android 系统；后续版本沿用同一更新链路。
+`v1.2.3` 起不再把应用私有缓存 URI 交给文件管理器，而是直接使用 Android 系统安装会话。
+若旧版更新时提示“打开目标文件夹失败”，请从本页手动下载并安装一次 `v1.2.3`；
+之后的应用内更新会使用新链路。
 
 ## 运行与构建
 
@@ -97,10 +100,10 @@ tool/flutter-msvc.bat build windows --release
 生成可供线上更新使用的 Inno Setup 安装包（需先安装 Inno Setup 6）：
 
 ```powershell
-& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.2.2 installer\DeskTile.iss
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.2.3 installer\DeskTile.iss
 ```
 
-产物：`dist\DeskTile-v1.2.2-windows-x64-setup.exe`
+产物：`dist\DeskTile-v1.2.3-windows-x64-setup.exe`
 
 两种运行模式（同一个 exe）：
 
@@ -145,9 +148,9 @@ D:\dev\flutter\bin\flutter.bat build appbundle --release
 提交后执行：
 
 ```powershell
-git tag v1.2.2
+git tag v1.2.3
 git push origin master
-git push origin v1.2.2
+git push origin v1.2.3
 ```
 
 工作流会上传 APK、AAB、Windows x64 Setup 和校验文件；客户端只选择本平台的安装包。
@@ -201,7 +204,7 @@ tool/
 
 已实测通过：
 
-- `flutter analyze` 无任何问题；`flutter test` 170 个测试全绿
+- `flutter analyze` 无任何问题；`flutter test` 170 个测试、Android 原生 3 个测试全绿
 - Release 构建成功，主窗口与挂件都实际运行并截图确认
 - Android 正式签名 APK/AAB 构建成功；API 36 模拟器完成通知、小组件、重启恢复验收
 - 单双周：第 1 周显示单周课、第 2 周显示双周课，界面测试与真机截图双向确认
