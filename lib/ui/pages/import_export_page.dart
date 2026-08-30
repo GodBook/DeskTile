@@ -9,6 +9,7 @@ import '../../core/import/course_info_dto.dart';
 import '../../core/import/cses_importer.dart';
 import '../../core/import/csv_importer.dart';
 import '../../core/import/exporter.dart';
+import '../../core/import/ics_exporter.dart';
 import '../../core/import/ics_importer.dart';
 import '../../core/import/json_importer.dart';
 import '../../core/models/timetable.dart';
@@ -91,6 +92,12 @@ class ImportExportPage extends StatelessWidget {
                   onPressed: () => _exportCses(context),
                   icon: const Icon(Icons.ios_share, size: 18),
                   label: const Text('导出 CSES YAML'),
+                ),
+                OutlinedButton.icon(
+                  key: const ValueKey('export-ics-calendar'),
+                  onPressed: () => _exportIcs(context),
+                  icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                  label: const Text('导出 ICS 课程日历'),
                 ),
                 OutlinedButton.icon(
                   onPressed: () => _openDataFolder(context),
@@ -518,6 +525,30 @@ Future<void> _exportCses(BuildContext context) async {
           ? '已导出 CSES'
           : '已导出，但有 ${result.warnings.length} 处无法精确表达：${result.warnings.first}',
     );
+  } catch (e) {
+    toast.show('导出失败：$e', error: true);
+  }
+}
+
+Future<void> _exportIcs(BuildContext context) async {
+  final toast = _Toast(context);
+  final timetable = AppScope.read(context).activeTimetable;
+  if (timetable == null) return;
+  IcsExport result;
+  try {
+    result = exportIcs(timetable);
+  } on FormatException catch (e) {
+    toast.show('无法导出：${e.message}', error: true);
+    return;
+  }
+  try {
+    final uri = await FilePicker.saveFile(
+      fileName: '${timetable.name}.ics',
+      bytes: Uint8List.fromList(utf8.encode(result.calendar)),
+      dialogTitle: '导出 ICS 课程日历',
+      allowedExtensions: const ['ics'],
+    );
+    if (uri != null) toast.show('已导出 ${result.eventCount} 条课程日程');
   } catch (e) {
     toast.show('导出失败：$e', error: true);
   }

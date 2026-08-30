@@ -2,7 +2,7 @@
 ; 从发布页首次安装时使用 LocalAppData；应用内升级会通过 /DIR 覆盖当前程序目录。
 
 #ifndef AppVersion
-  #define AppVersion "1.2.7"
+  #define AppVersion "1.2.8"
 #endif
 
 [Setup]

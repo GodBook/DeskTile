@@ -31,7 +31,7 @@ class MorePage extends StatelessWidget {
       ListTile(
         leading: const Icon(Icons.import_export_outlined),
         title: const Text('导入导出'),
-        subtitle: const Text('导入课表、导出备份和 CSES 文件'),
+        subtitle: const Text('导入课表，导出 ICS 日历、备份和 CSES 文件'),
         trailing: const Icon(Icons.chevron_right),
         onTap: () =>
             _open(context, title: '导入导出', child: const ImportExportPage()),

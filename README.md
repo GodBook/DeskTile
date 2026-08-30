@@ -2,9 +2,9 @@
 
 跨 Windows 与 Android 的极简课程表。无广告、无账号、纯本地，冷启动即用。
 
-**当前稳定版本：v1.2.7**。Windows 桌面挂件与 Android
+**当前稳定版本：v1.2.8**。Windows 桌面挂件与 Android
 手机界面、Glance 主屏小组件、多课表、学期校历、今天日程、课程与待办提醒、双端线上更新均已完成；
-205 个 Flutter 测试和 3 个 Android 原生测试通过。
+210 个 Flutter 测试和 3 个 Android 原生测试通过。
 
 > 接手开发请先读 **[HANDOVER.md](HANDOVER.md)** —— 环境坑、架构决策、文件职责、
 > 验证记录、Phase 2/3 落地步骤和排错手册都在那里。本文件只是使用向导。
@@ -13,12 +13,12 @@
 
 ## 下载
 
-当前稳定版前往 [v1.2.7 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.2.7)：
+当前稳定版前往 [v1.2.8 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.2.8)：
 
-- `DeskTile-v1.2.7-android.apk`：Android 安装包
-- `DeskTile-v1.2.7-android.aab`：应用商店上传包，不能直接安装
-- `DeskTile-v1.2.7-windows-x64-setup.exe`：Windows x64 安装包
-- `DeskTile-v1.2.7-SHA256SUMS.txt`、`DeskTile-v1.2.7-windows-SHA256SUMS.txt`：安装包校验值
+- `DeskTile-v1.2.8-android.apk`：Android 安装包
+- `DeskTile-v1.2.8-android.aab`：应用商店上传包，不能直接安装
+- `DeskTile-v1.2.8-windows-x64-setup.exe`：Windows x64 安装包
+- `DeskTile-v1.2.8-SHA256SUMS.txt`、`DeskTile-v1.2.8-windows-SHA256SUMS.txt`：安装包校验值
 
 ## 已实现（Windows）
 
@@ -45,7 +45,8 @@
   通知可一键推迟 10 分钟
 - **导入**：CSV、CSES v2 YAML、ICS、小爱课程表 `courseInfos` JSON，导入前先给解析预览和警告，
   可选择覆盖当前课表或导入为新课表
-- **导出**：CSES v2 YAML（可被 ClassIsland 等读取）、完整备份 JSON；备份包含作业与待办
+- **导出**：ICS 课程日历（逐次展开实际安排，可导入系统日历）、CSES v2 YAML
+  （可被 ClassIsland 等读取）、完整备份 JSON；备份包含作业与待办
 - **开机自启**：写 `HKCU\...\CurrentVersion\Run`，启动的是挂件模式，不需要管理员权限
 - **线上更新**：设置 → 应用更新可检查稳定版、显示发布说明、流式下载安装包并启动覆盖安装；
   主窗口和挂件会由安装器关闭，课表数据仍保留在 `%APPDATA%`
@@ -112,10 +113,10 @@ tool/flutter-msvc.bat build windows --release
 生成可供线上更新使用的 Inno Setup 安装包（需先安装 Inno Setup 6）：
 
 ```powershell
-& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.2.7 installer\DeskTile.iss
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.2.8 installer\DeskTile.iss
 ```
 
-产物：`dist\DeskTile-v1.2.7-windows-x64-setup.exe`
+产物：`dist\DeskTile-v1.2.8-windows-x64-setup.exe`
 
 两种运行模式（同一个 exe）：
 
@@ -161,8 +162,8 @@ D:\dev\flutter\bin\flutter.bat build appbundle --release
 
 ```powershell
 git push origin master
-git tag -a v1.2.7 -m "DeskTile v1.2.7"
-git push origin v1.2.7
+git tag -a v1.2.8 -m "DeskTile v1.2.8"
+git push origin v1.2.8
 ```
 
 工作流会上传 APK、AAB、Windows x64 Setup 和校验文件；客户端只选择本平台的安装包。
@@ -181,12 +182,13 @@ Windows 工作流目前生成未签名安装器，不需要额外 Secret；Andro
 |---|---|
 | `.csv` | 表头 `课程名称,教师,教室,星期,节次,周次`。星期认 `1..7` / `周三` / `星期三` / `Wed`；周次认 `1-16`、`1-16单`、`双`、`1-8,10,12-16`、全角逗号。模板见 `docs/示例课表.csv`，设置页也能直接导出模板 |
 | `.yaml` / `.yml` | [CSES v2](https://github.com/CSES-org/CSES)。它用「循环中的第几个工作日」定位课程，导入时会按 `cycle.spans` 还原成星期几 + 单双周；只支持 1 周和 2 周循环，更长的循环会明确报错而不是悄悄算错 |
-| `.ics` | 每次课一条 VEVENT 的日历文件。学期第一周周一按最早的事件推算，节次时间表按出现过的时间段推算；带 `RRULE` 的重复事件不展开，会在警告里说明 |
+| `.ics` | 每次课一条 VEVENT 的日历文件。学期第一周周一按最早的事件推算，节次时间表按出现过的时间段推算；带 `RRULE` 的重复事件不展开，会在警告里说明。DeskTile 也可把当前课表的实际课程逐次导出为 ICS，自动排除停课并应用调课、补课 |
 | `.json` | 小爱课程表的 `{"courseInfos":[...]}` 结构（`sections` 支持 `[{section:1}]` 和 `[1]` 两种写法），或本程序导出的完整备份；DeskTile 备份会保留临时调课、停课、补课、作业待办和内部关联 ID |
 
 导入确认前会先显示解析到多少门课、多少个时段以及全部警告，并可选择**覆盖当前课表**或
 **导入为新课表**。完整备份导入为新课表时，会保留现有待办，并为追加事项生成新 ID、重绑课程。
-CSES/CSV/ICS 本身无法完整表达单次课程变更；需要跨端迁移临时安排时请使用 JSON 备份。
+CSES/CSV 和外部 ICS 本身无法完整表达 DeskTile 的单次课程变更。DeskTile 导出的 ICS 会写入变更后的
+实际日程，但不保留可继续编辑的变更来源；需要跨端迁移完整数据时请使用 JSON 备份。
 
 ## 目录结构
 
@@ -219,7 +221,7 @@ tool/
 
 已实测通过：
 
-- `flutter analyze` 无任何问题；`flutter test` 205 个测试、Android 原生 3 个测试全绿
+- `flutter analyze` 无任何问题；`flutter test` 210 个测试、Android 原生 3 个测试全绿
 - Release 构建成功，主窗口与挂件都实际运行并截图确认
 - Android 正式签名 APK/AAB 构建成功；API 36 模拟器完成通知、小组件、重启恢复验收
 - 单双周：第 1 周显示单周课、第 2 周显示双周课，界面测试与真机截图双向确认
@@ -227,6 +229,7 @@ tool/
   `pendingNotificationRequests` 确认系统已接收
 - 跨进程同步：外部改写数据文件后挂件 ~1 秒内刷新
 - 导出的 CSES YAML 通过官方 `cses.schema.json`（draft-07）校验
+- 导出的 ICS 通过 iCalendar 解析器回读；时间、单双周、停课、调课、补课、UTF-8 折行均有测试覆盖
 
 已知限制：
 

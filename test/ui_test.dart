@@ -295,6 +295,7 @@ void main() {
     await tester.tap(find.widgetWithText(ListTile, '导入导出'));
     await tester.pumpAndSettle();
     expect(find.byType(ImportExportPage), findsOneWidget);
+    expect(find.byKey(const ValueKey('export-ics-calendar')), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
