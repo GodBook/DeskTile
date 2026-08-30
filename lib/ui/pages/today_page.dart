@@ -14,6 +14,7 @@ import '../../platform/notifications.dart';
 import '../theme.dart';
 import 'exams_page.dart';
 import 'schedule_change_editor.dart';
+import 'academic_calendar_page.dart';
 import 'session_editor.dart';
 import 'tasks_page.dart';
 import 'timetable_manager.dart';
@@ -319,6 +320,8 @@ class _CourseTimelineRow extends StatelessWidget {
       SessionOccurrenceKind.rescheduledTarget => '临时调课',
       SessionOccurrenceKind.extraClass => '临时补课',
       SessionOccurrenceKind.regular => null,
+      SessionOccurrenceKind.calendarSuspended =>
+        '校历停课${session.calendarEvent == null ? '' : ' · ${session.calendarEvent!.title}'}',
     };
     return _TimelineRow(
       time: session.startSlot.startText,
@@ -326,8 +329,11 @@ class _CourseTimelineRow extends StatelessWidget {
       onTap: timetableWeek == null
           ? null
           : () {
+              final calendarEvent = session.calendarEvent;
               final change = session.change;
-              if (change != null) {
+              if (calendarEvent != null) {
+                showAcademicCalendarEventEditor(context, event: calendarEvent);
+              } else if (change != null) {
                 showScheduleChangeEditor(
                   context,
                   week: timetableWeek!,

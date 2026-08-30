@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:desktile/core/widget_payload.dart';
+import 'package:desktile/core/models/academic_calendar_event.dart';
 import 'package:desktile/core/models/course.dart';
 import 'package:desktile/core/models/exam.dart';
 import 'package:desktile/core/models/schedule_change.dart';
@@ -76,6 +77,27 @@ void main() {
           id: 'cancel',
           originalSessionId: 's1',
           originalDate: DateTime(2026, 8, 17),
+        ),
+      ],
+    );
+    final payload = buildWidgetPayload(
+      timetable: changed,
+      now: DateTime(2026, 8, 17, 7),
+    );
+
+    expect(payload.nextTitle, isEmpty);
+    expect(payload.remainingToday, 0);
+  });
+
+  test('校历批量停课后小组件不再显示该课程', () {
+    final changed = timetable.copyWith(
+      academicCalendarEvents: [
+        AcademicCalendarEvent(
+          id: 'holiday',
+          title: '假期',
+          type: AcademicCalendarEventType.holiday,
+          startDate: DateTime(2026, 8, 17),
+          endDate: DateTime(2026, 8, 17),
         ),
       ],
     );

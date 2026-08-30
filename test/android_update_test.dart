@@ -8,7 +8,7 @@ import 'package:http/testing.dart';
 
 void main() {
   test('Android 回退版本与当前发布版本一致', () {
-    expect(defaultAndroidVersion, '1.2.6');
+    expect(defaultAndroidVersion, '1.2.7');
   });
 
   test('Android 版本比较遵循数字和预发布版本规则', () {

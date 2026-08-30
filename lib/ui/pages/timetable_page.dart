@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/agenda.dart';
+import '../../core/academic_calendar.dart';
 import '../../core/models/timetable.dart';
 import '../../core/week_math.dart';
 import '../../data/app_state.dart';
 import '../theme.dart';
+import 'academic_calendar_page.dart';
 import 'schedule_change_editor.dart';
 import 'session_editor.dart';
 import 'timetable_manager.dart';
@@ -143,6 +145,11 @@ class _Toolbar extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     IconButton(
+                      tooltip: '学期校历',
+                      onPressed: () => openAcademicCalendarPage(context),
+                      icon: const Icon(Icons.date_range_outlined, size: 20),
+                    ),
+                    IconButton(
                       tooltip: timetable.courses.isEmpty ? '先添加常规课程' : '添加补课',
                       onPressed: timetable.courses.isEmpty
                           ? null
@@ -229,6 +236,12 @@ class _Toolbar extends StatelessWidget {
                 label: Text(realWeek == null ? '不在学期内' : '回到本周'),
               ),
               const Spacer(),
+              IconButton(
+                tooltip: '学期校历',
+                onPressed: () => openAcademicCalendarPage(context),
+                icon: const Icon(Icons.date_range_outlined, size: 20),
+              ),
+              const SizedBox(width: 4),
               IconButton(
                 tooltip: timetable.courses.isEmpty ? '先添加常规课程' : '添加补课',
                 onPressed: timetable.courses.isEmpty
@@ -496,45 +509,72 @@ class _HeaderRow extends StatelessWidget {
         children: [
           const SizedBox(width: _timeColumnWidth),
           for (var day = 1; day <= dayCount; day++)
-            SizedBox(
-              width: colWidth,
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: day == todayDay
-                      ? theme.colorScheme.primaryContainer.withValues(
-                          alpha: 0.5,
-                        )
-                      : null,
-                  border: Border(
-                    left: BorderSide(color: theme.dividerColor, width: 0.5),
-                  ),
-                ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        weekDayName(day),
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: day == todayDay
-                              ? FontWeight.bold
-                              : FontWeight.w500,
+            Builder(
+              builder: (context) {
+                final date = dateOfWeekDay(timetable.termStart, week, day);
+                final events = calendarEventsOnDate(timetable, date);
+                final suspended = events.any((event) => event.suspendsClasses);
+                return SizedBox(
+                  width: colWidth,
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: day == todayDay
+                          ? theme.colorScheme.primaryContainer.withValues(
+                              alpha: 0.5,
+                            )
+                          : suspended
+                          ? theme.colorScheme.tertiaryContainer.withValues(
+                              alpha: 0.45,
+                            )
+                          : null,
+                      border: Border(
+                        left: BorderSide(color: theme.dividerColor, width: 0.5),
+                      ),
+                    ),
+                    child: Tooltip(
+                      message: events.map((event) => event.title).join('、'),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              weekDayName(day),
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                fontWeight: day == todayDay
+                                    ? FontWeight.bold
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  monthDayText(date),
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.outline,
+                                  ),
+                                ),
+                                if (events.isNotEmpty) ...[
+                                  const SizedBox(width: 3),
+                                  Icon(
+                                    suspended
+                                        ? Icons.event_busy_outlined
+                                        : Icons.event_note_outlined,
+                                    size: 11,
+                                    color: theme.colorScheme.tertiary,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      Text(
-                        monthDayText(
-                          dateOfWeekDay(timetable.termStart, week, day),
-                        ),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.outline,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
         ],
       ),
@@ -702,11 +742,13 @@ class _CourseBlock extends StatelessWidget {
       SessionOccurrenceKind.rescheduledSource => '调出',
       SessionOccurrenceKind.rescheduledTarget => '调课',
       SessionOccurrenceKind.extraClass => '补课',
+      SessionOccurrenceKind.calendarSuspended => '校历',
     };
     final change = session.change;
-    final detail =
-        session.occurrence == SessionOccurrenceKind.rescheduledSource &&
-            change?.targetDate != null
+    final detail = session.occurrence == SessionOccurrenceKind.calendarSuspended
+        ? session.calendarEvent?.title
+        : session.occurrence == SessionOccurrenceKind.rescheduledSource &&
+              change?.targetDate != null
         ? '调至 ${change!.targetDate!.month}/${change.targetDate!.day} '
               '第${change.startSection}-${change.endSection}节'
         : session.session.room;
@@ -724,7 +766,12 @@ class _CourseBlock extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: () => session.change == null
+        onTap: () => session.calendarEvent != null
+            ? showAcademicCalendarEventEditor(
+                context,
+                event: session.calendarEvent,
+              )
+            : session.change == null
             ? showSessionEditor(context, week: week, session: session.session)
             : showScheduleChangeEditor(
                 context,

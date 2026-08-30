@@ -1,3 +1,4 @@
+import 'package:desktile/core/models/academic_calendar_event.dart';
 import 'package:desktile/core/models/settings.dart';
 import 'package:desktile/core/models/schedule_change.dart';
 import 'package:desktile/core/reminder_plan.dart';
@@ -161,6 +162,28 @@ void main() {
       expect(list.map((reminder) => reminder.title), ['下节课：线性代数', '下节课：大学英语']);
       expect(list.last.fireAt, DateTime(2026, 9, 8, 9, 45));
       expect(list.last.body, contains('新教室'));
+    });
+
+    test('校历批量停课不再排课程提醒', () {
+      final changed = t.copyWith(
+        academicCalendarEvents: [
+          AcademicCalendarEvent(
+            id: 'holiday',
+            title: '校庆日',
+            type: AcademicCalendarEventType.holiday,
+            startDate: DateTime(2026, 9, 7),
+            endDate: DateTime(2026, 9, 7),
+          ),
+        ],
+      );
+      final list = buildReminders(
+        timetable: changed,
+        settings: const AppSettings(reminderMode: ReminderMode.everyClass),
+        from: DateTime(2026, 9, 7),
+        daysAhead: 1,
+      );
+
+      expect(list, isEmpty);
     });
   });
 

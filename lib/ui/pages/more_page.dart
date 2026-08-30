@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../platform/notifications.dart';
+import 'academic_calendar_page.dart';
 import 'import_export_page.dart';
 import 'settings_page.dart';
 
@@ -16,6 +17,15 @@ class MorePage extends StatelessWidget {
       Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Text('更多', style: Theme.of(context).textTheme.titleMedium),
+      ),
+      const Divider(height: 1),
+      ListTile(
+        leading: const Icon(Icons.date_range_outlined),
+        title: const Text('学期校历'),
+        subtitle: const Text('管理假期、考试周和批量停课'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () =>
+            _open(context, title: '学期校历', child: const AcademicCalendarPage()),
       ),
       const Divider(height: 1),
       ListTile(

@@ -168,6 +168,9 @@ Timetable buildTimetable({
       scheduleChanges: source.scheduleChanges
           .map((change) => change.shiftedByDays(shiftDays))
           .toList(),
+      academicCalendarEvents: source.academicCalendarEvents
+          .map((event) => event.shiftedByDays(shiftDays))
+          .toList(),
     );
   }
   final courses = <String, Course>{};

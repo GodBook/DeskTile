@@ -5,7 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import 'release_update.dart';
 
-const defaultWindowsVersion = '1.2.6';
+const defaultWindowsVersion = '1.2.7';
 
 enum WindowsInstallResult { started }
 

@@ -1,4 +1,5 @@
 import '../week_math.dart';
+import 'academic_calendar_event.dart';
 import 'course.dart';
 import 'schedule_change.dart';
 import 'time_slot.dart';
@@ -18,6 +19,7 @@ class Timetable {
     this.courses = const [],
     this.sessions = const [],
     this.scheduleChanges = const [],
+    this.academicCalendarEvents = const [],
   }) : termStart = mondayOf(termStart);
 
   final String id;
@@ -32,6 +34,7 @@ class Timetable {
   final List<Course> courses;
   final List<CourseSession> sessions;
   final List<ScheduleChange> scheduleChanges;
+  final List<AcademicCalendarEvent> academicCalendarEvents;
 
   Course? courseById(String id) {
     for (final c in courses) {
@@ -68,6 +71,7 @@ class Timetable {
     List<Course>? courses,
     List<CourseSession>? sessions,
     List<ScheduleChange>? scheduleChanges,
+    List<AcademicCalendarEvent>? academicCalendarEvents,
   }) => Timetable(
     id: id,
     name: name ?? this.name,
@@ -79,6 +83,8 @@ class Timetable {
     courses: courses ?? this.courses,
     sessions: sessions ?? this.sessions,
     scheduleChanges: scheduleChanges ?? this.scheduleChanges,
+    academicCalendarEvents:
+        academicCalendarEvents ?? this.academicCalendarEvents,
   );
 
   Map<String, dynamic> toJson() => {
@@ -92,6 +98,9 @@ class Timetable {
     'courses': courses.map((c) => c.toJson()).toList(),
     'sessions': sessions.map((s) => s.toJson()).toList(),
     'scheduleChanges': scheduleChanges.map((c) => c.toJson()).toList(),
+    'academicCalendarEvents': academicCalendarEvents
+        .map((event) => event.toJson())
+        .toList(),
   };
 
   factory Timetable.fromJson(Map<String, dynamic> json) => Timetable(
@@ -114,6 +123,9 @@ class Timetable {
         .toList(),
     scheduleChanges: (json['scheduleChanges'] as List? ?? [])
         .map((e) => ScheduleChange.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    academicCalendarEvents: (json['academicCalendarEvents'] as List? ?? [])
+        .map((e) => AcademicCalendarEvent.fromJson(e as Map<String, dynamic>))
         .toList(),
   );
 }

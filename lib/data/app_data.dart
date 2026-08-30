@@ -25,7 +25,7 @@ class AppData {
   final String? activeTimetableId;
   final List<TaskItem> tasks;
 
-  static const schemaVersion = 4;
+  static const schemaVersion = 5;
 
   Timetable? get activeTimetable {
     if (timetables.isEmpty) return null;

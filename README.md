@@ -2,9 +2,9 @@
 
 跨 Windows 与 Android 的极简课程表。无广告、无账号、纯本地，冷启动即用。
 
-**当前稳定版本：v1.2.6**。Windows 桌面挂件与 Android
-手机界面、Glance 主屏小组件、多课表、今天日程、课程与待办提醒、双端线上更新均已完成；
-191 个 Flutter 测试和 3 个 Android 原生测试通过。
+**当前稳定版本：v1.2.7**。Windows 桌面挂件与 Android
+手机界面、Glance 主屏小组件、多课表、学期校历、今天日程、课程与待办提醒、双端线上更新均已完成；
+205 个 Flutter 测试和 3 个 Android 原生测试通过。
 
 > 接手开发请先读 **[HANDOVER.md](HANDOVER.md)** —— 环境坑、架构决策、文件职责、
 > 验证记录、Phase 2/3 落地步骤和排错手册都在那里。本文件只是使用向导。
@@ -13,12 +13,12 @@
 
 ## 下载
 
-当前稳定版前往 [v1.2.6 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.2.6)：
+当前稳定版前往 [v1.2.7 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.2.7)：
 
-- `DeskTile-v1.2.6-android.apk`：Android 安装包
-- `DeskTile-v1.2.6-android.aab`：应用商店上传包，不能直接安装
-- `DeskTile-v1.2.6-windows-x64-setup.exe`：Windows x64 安装包
-- `DeskTile-v1.2.6-SHA256SUMS.txt`、`DeskTile-v1.2.6-windows-SHA256SUMS.txt`：安装包校验值
+- `DeskTile-v1.2.7-android.apk`：Android 安装包
+- `DeskTile-v1.2.7-android.aab`：应用商店上传包，不能直接安装
+- `DeskTile-v1.2.7-windows-x64-setup.exe`：Windows x64 安装包
+- `DeskTile-v1.2.7-SHA256SUMS.txt`、`DeskTile-v1.2.7-windows-SHA256SUMS.txt`：安装包校验值
 
 ## 已实现（Windows）
 
@@ -32,6 +32,8 @@
   顶栏可以逐周切换并显示当前是单周还是双周
 - **临时调课 / 停课 / 补课**：打开某次常规课程可只调整当日安排；调课可改日期、节次和教室，
   停课保留灰色删除线标记；工具栏按钮或空白格右键可添加一次性补课，冲突会即时提示
+- **学期校历与批量停课**：按日期范围记录假期、考试周、停课安排或其他校历事件；可仅做标记，
+  也可一次暂停范围内的常规课程，调入和补课仍然保留；周视图、今天页、提醒与挂件同步生效
 - **桌面挂件**：无边框圆角卡片，贴在桌面上（不遮挡其它窗口），任意位置拖动、位置记忆，
   托盘常驻。显示「第 N 周 · 周几 · 单/双周 → 下一节（课名 + **教室** + 倒计时）→ 今日课程 →
   最近考试倒计时」，另有只显示下一节的迷你形态
@@ -64,6 +66,8 @@ GitHub 返回资产 SHA-256 digest 时，客户端会在启动安装器前自动
 - **作业与待办**：与 Windows 共用数据和界面，支持课程关联、重要程度、截止时间、分组筛选及完成状态
 - **临时调课 / 停课 / 补课**：与 Windows 共用数据和编辑器；长按空白格可直接添加补课，
   临时安排会同步影响提醒和主屏小组件
+- **学期校历与批量停课**：从“更多”进入校历，管理假期、考试周和日期范围停课；
+  课程提醒、今天页和主屏小组件会自动排除被暂停的常规课程
 - **主屏小组件**：Jetpack Glance 展示周次、下一节、教室、今日剩余和最近考试
 - **即时刷新**：课程保存后约 300ms 更新小组件，后台每 30 分钟刷新
 - **精准提醒**：设备 IANA 时区、精准闹钟、锁屏待机调度；课程通知正文包含教室，
@@ -108,10 +112,10 @@ tool/flutter-msvc.bat build windows --release
 生成可供线上更新使用的 Inno Setup 安装包（需先安装 Inno Setup 6）：
 
 ```powershell
-& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.2.6 installer\DeskTile.iss
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.2.7 installer\DeskTile.iss
 ```
 
-产物：`dist\DeskTile-v1.2.6-windows-x64-setup.exe`
+产物：`dist\DeskTile-v1.2.7-windows-x64-setup.exe`
 
 两种运行模式（同一个 exe）：
 
@@ -157,8 +161,8 @@ D:\dev\flutter\bin\flutter.bat build appbundle --release
 
 ```powershell
 git push origin master
-git tag -a v1.2.6 -m "DeskTile v1.2.6"
-git push origin v1.2.6
+git tag -a v1.2.7 -m "DeskTile v1.2.7"
+git push origin v1.2.7
 ```
 
 工作流会上传 APK、AAB、Windows x64 Setup 和校验文件；客户端只选择本平台的安装包。
@@ -215,7 +219,7 @@ tool/
 
 已实测通过：
 
-- `flutter analyze` 无任何问题；`flutter test` 191 个测试、Android 原生 3 个测试全绿
+- `flutter analyze` 无任何问题；`flutter test` 205 个测试、Android 原生 3 个测试全绿
 - Release 构建成功，主窗口与挂件都实际运行并截图确认
 - Android 正式签名 APK/AAB 构建成功；API 36 模拟器完成通知、小组件、重启恢复验收
 - 单双周：第 1 周显示单周课、第 2 周显示双周课，界面测试与真机截图双向确认

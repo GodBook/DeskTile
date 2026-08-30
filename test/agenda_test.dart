@@ -1,4 +1,5 @@
 import 'package:desktile/core/agenda.dart';
+import 'package:desktile/core/models/academic_calendar_event.dart';
 import 'package:desktile/core/models/schedule_change.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -130,6 +131,79 @@ void main() {
         SessionOccurrenceKind.extraClass,
       );
       expect(target.single.session.session.id, 'change:change3');
+    });
+  });
+
+  group('学期校历', () {
+    test('批量停课从实际日程移除，周视图保留校历停课来源', () {
+      final event = AcademicCalendarEvent(
+        id: 'holiday',
+        title: '校庆日',
+        type: AcademicCalendarEventType.holiday,
+        startDate: DateTime(2026, 9, 7),
+        endDate: DateTime(2026, 9, 8),
+      );
+      final changed = t.copyWith(academicCalendarEvents: [event]);
+
+      expect(agendaForDate(changed, DateTime(2026, 9, 7)), isEmpty);
+      final visual = sessionsOnDate(
+        changed,
+        DateTime(2026, 9, 7),
+        includeChangedSources: true,
+      );
+      expect(visual, hasLength(2));
+      expect(
+        visual.map((item) => item.occurrence),
+        everyElement(SessionOccurrenceKind.calendarSuspended),
+      );
+      expect(visual.first.calendarEvent?.title, '校庆日');
+    });
+
+    test('纯校历标记不暂停课程', () {
+      final changed = t.copyWith(
+        academicCalendarEvents: [
+          AcademicCalendarEvent(
+            id: 'exam',
+            title: '考试周',
+            type: AcademicCalendarEventType.examWeek,
+            startDate: DateTime(2026, 9, 7),
+            endDate: DateTime(2026, 9, 13),
+            suspendsClasses: false,
+          ),
+        ],
+      );
+
+      expect(agendaForDate(changed, DateTime(2026, 9, 7)), hasLength(2));
+    });
+
+    test('校历停课不覆盖显式添加的补课', () {
+      final changed = t.copyWith(
+        academicCalendarEvents: [
+          AcademicCalendarEvent(
+            id: 'holiday',
+            title: '假期',
+            type: AcademicCalendarEventType.holiday,
+            startDate: DateTime(2026, 9, 7),
+            endDate: DateTime(2026, 9, 7),
+          ),
+        ],
+        scheduleChanges: [
+          ScheduleChange.extraClass(
+            id: 'extra',
+            courseId: 'c3',
+            targetDate: DateTime(2026, 9, 7),
+            startSection: 8,
+            endSection: 9,
+          ),
+        ],
+      );
+
+      final actual = agendaForDate(changed, DateTime(2026, 9, 7));
+      expect(actual, hasLength(1));
+      expect(
+        actual.single.session.occurrence,
+        SessionOccurrenceKind.extraClass,
+      );
     });
   });
 

@@ -264,6 +264,7 @@ Future<void> _duplicateTimetable(BuildContext context, Timetable source) async {
       courses: source.courses,
       sessions: source.sessions,
       scheduleChanges: source.scheduleChanges,
+      academicCalendarEvents: source.academicCalendarEvents,
     ),
   );
   if (context.mounted) Navigator.of(context).pop();

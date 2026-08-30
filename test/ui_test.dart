@@ -5,6 +5,7 @@ import 'package:desktile/core/import/course_info_dto.dart';
 import 'package:desktile/core/import/csv_importer.dart';
 import 'package:desktile/core/import/json_importer.dart';
 import 'package:desktile/core/models/course.dart';
+import 'package:desktile/core/models/academic_calendar_event.dart';
 import 'package:desktile/core/models/exam.dart';
 import 'package:desktile/core/models/schedule_change.dart';
 import 'package:desktile/core/models/settings.dart';
@@ -17,6 +18,7 @@ import 'package:desktile/data/widget_position.dart';
 import 'package:desktile/platform/notifications.dart';
 import 'package:desktile/ui/app.dart';
 import 'package:desktile/ui/pages/exams_page.dart';
+import 'package:desktile/ui/pages/academic_calendar_page.dart';
 import 'package:desktile/ui/pages/import_export_page.dart';
 import 'package:desktile/ui/pages/settings_page.dart';
 import 'package:desktile/ui/pages/tasks_page.dart';
@@ -268,7 +270,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('手机更多页可以进入导入导出和设置', (tester) async {
+  testWidgets('手机更多页可以进入校历、导入导出和设置', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(360, 800);
     addTearDown(tester.view.reset);
@@ -280,8 +282,15 @@ void main() {
 
     await tester.tap(find.text('更多'));
     await tester.pumpAndSettle();
+    expect(find.widgetWithText(ListTile, '学期校历'), findsOneWidget);
     expect(find.widgetWithText(ListTile, '导入导出'), findsOneWidget);
     expect(find.widgetWithText(ListTile, '设置'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ListTile, '学期校历'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AcademicCalendarPage), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(ListTile, '导入导出'));
     await tester.pumpAndSettle();
@@ -463,6 +472,101 @@ void main() {
     expect(find.text('第 2 周 · 双周'), findsOneWidget);
     expect(find.text('线性代数'), findsNothing);
     expect(find.text('高等数学'), findsOneWidget, reason: '每周的课不受单双周影响');
+  });
+
+  testWidgets('学期校历：可以添加批量停课并写入磁盘', (tester) async {
+    final state = await _makeState(tester);
+    await tester.pumpWidget(_host(state, const AcademicCalendarPage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('还没有校历安排'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('academic-calendar-add')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('academic-calendar-title')),
+      '校庆日',
+    );
+    await _pressAsyncButton(
+      tester,
+      find.byKey(const ValueKey('academic-calendar-save')),
+    );
+
+    expect(find.text('校庆日'), findsOneWidget);
+    expect(state.activeTimetable!.academicCalendarEvents, hasLength(1));
+    expect(
+      state.activeTimetable!.academicCalendarEvents.single.suspendsClasses,
+      isTrue,
+    );
+
+    late List<AcademicCalendarEvent> persisted;
+    await tester.runAsync(() async {
+      persisted =
+          (await state.store.load()).activeTimetable!.academicCalendarEvents;
+    });
+    expect(persisted.single.title, '校庆日');
+  });
+
+  testWidgets('学期校历：320px 下概览、列表和编辑器无溢出', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 700);
+    addTearDown(tester.view.reset);
+
+    final timetable = buildTestTimetable(termStart: mondayOf(DateTime.now()))
+        .copyWith(
+          academicCalendarEvents: [
+            AcademicCalendarEvent(
+              id: 'holiday',
+              title: '国庆节假期与全校统一停课安排',
+              type: AcademicCalendarEventType.holiday,
+              startDate: mondayOf(DateTime.now()),
+              endDate: mondayOf(DateTime.now()).add(const Duration(days: 6)),
+            ),
+          ],
+        );
+    final state = await _makeState(
+      tester,
+      timetables: [timetable],
+      activeTimetableId: timetable.id,
+    );
+    await tester.pumpWidget(_host(state, const AcademicCalendarPage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('校历安排'), findsOneWidget);
+    expect(find.text('停课天'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('academic-calendar-add')));
+    await tester.pumpAndSettle();
+    expect(find.text('添加校历安排'), findsOneWidget);
+    expect(find.text('暂停常规课程'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('周视图：校历停课显示原因并可打开编辑器', (tester) async {
+    final timetable = buildTestTimetable(termStart: mondayOf(DateTime.now()))
+        .copyWith(
+          academicCalendarEvents: [
+            AcademicCalendarEvent(
+              id: 'holiday',
+              title: '校庆日',
+              type: AcademicCalendarEventType.holiday,
+              startDate: mondayOf(DateTime.now()),
+              endDate: mondayOf(DateTime.now()),
+            ),
+          ],
+        );
+    final state = await _makeState(
+      tester,
+      timetables: [timetable],
+      activeTimetableId: timetable.id,
+    );
+    await tester.pumpWidget(_host(state, const TimetablePage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('校历'), findsNWidgets(2));
+    expect(find.text('校庆日'), findsNWidgets(2));
+    await tester.tap(find.text('校历').first);
+    await tester.pumpAndSettle();
+    expect(find.text('编辑校历安排'), findsOneWidget);
   });
 
   testWidgets('临时停课：从常规课程创建后在周视图标记并写入磁盘', (tester) async {

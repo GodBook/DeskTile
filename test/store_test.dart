@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:desktile/core/models/exam.dart';
+import 'package:desktile/core/models/academic_calendar_event.dart';
 import 'package:desktile/core/models/settings.dart';
 import 'package:desktile/core/models/schedule_change.dart';
 import 'package:desktile/core/models/task_item.dart';
@@ -45,6 +46,15 @@ void main() {
           startSection: 5,
           endSection: 6,
           room: '临时教室',
+        ),
+      ],
+      academicCalendarEvents: [
+        AcademicCalendarEvent(
+          id: 'holiday',
+          title: '国庆假期',
+          type: AcademicCalendarEventType.holiday,
+          startDate: DateTime(2026, 10, 1),
+          endDate: DateTime(2026, 10, 7),
         ),
       ],
     );
@@ -104,6 +114,10 @@ void main() {
     expect(change.originalDate, DateTime(2026, 9, 7));
     expect(change.targetDate, DateTime(2026, 9, 8));
     expect(change.room, '临时教室');
+    final calendarEvent =
+        loaded.timetables.single.academicCalendarEvents.single;
+    expect(calendarEvent.title, '国庆假期');
+    expect(calendarEvent.endDate, DateTime(2026, 10, 7));
 
     expect(loaded.exams.single.seat, '12');
     expect(loaded.tasks.single.title, '完成高数习题');
@@ -152,7 +166,7 @@ void main() {
     final file = await store.dataFile();
     final json = jsonDecode(utf8.decode(file.readAsBytesSync()));
     expect(json['schemaVersion'], AppData.schemaVersion);
-    expect(json['schemaVersion'], 4);
+    expect(json['schemaVersion'], 5);
   });
 
   test('旧数据没有 tasks 字段时按空列表读取', () {
@@ -164,6 +178,13 @@ void main() {
     final json = buildTestTimetable().toJson()..remove('scheduleChanges');
     final timetable = Timetable.fromJson(json);
     expect(timetable.scheduleChanges, isEmpty);
+  });
+
+  test('旧课表没有 academicCalendarEvents 字段时按空列表读取', () {
+    final json = buildTestTimetable().toJson()
+      ..remove('academicCalendarEvents');
+    final timetable = Timetable.fromJson(json);
+    expect(timetable.academicCalendarEvents, isEmpty);
   });
 
   test('旧数据缺少归档和待办提醒字段时使用默认值', () {

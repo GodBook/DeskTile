@@ -6,6 +6,7 @@ import 'package:desktile/core/import/csv_importer.dart';
 import 'package:desktile/core/import/ics_importer.dart';
 import 'package:desktile/core/import/json_importer.dart';
 import 'package:desktile/core/models/course.dart';
+import 'package:desktile/core/models/academic_calendar_event.dart';
 import 'package:desktile/core/models/schedule_change.dart';
 import 'package:desktile/core/models/task_item.dart';
 import 'package:desktile/core/models/timetable.dart';
@@ -176,6 +177,15 @@ void main() {
             room: '临时教室',
           ),
         ],
+        academicCalendarEvents: [
+          AcademicCalendarEvent(
+            id: 'holiday',
+            title: '国庆假期',
+            type: AcademicCalendarEventType.holiday,
+            startDate: DateTime(2026, 10, 1),
+            endDate: DateTime(2026, 10, 7),
+          ),
+        ],
       );
       final inactive = Map<String, dynamic>.from(active.toJson())
         ..['id'] = 'inactive'
@@ -232,6 +242,7 @@ void main() {
       expect(rebuilt.sessions.first.id, 's1');
       expect(rebuilt.scheduleChanges.single.id, 'move');
       expect(rebuilt.scheduleChanges.single.targetDate, DateTime(2026, 9, 8));
+      expect(rebuilt.academicCalendarEvents.single.title, '国庆假期');
     });
 
     test('恢复备份时修改学期起始日会同步平移临时安排', () {
@@ -245,6 +256,15 @@ void main() {
             endSection: 6,
           ),
         ],
+        academicCalendarEvents: [
+          AcademicCalendarEvent(
+            id: 'holiday',
+            title: '假期',
+            type: AcademicCalendarEventType.holiday,
+            startDate: DateTime(2026, 9, 10),
+            endDate: DateTime(2026, 9, 12),
+          ),
+        ],
       );
       final imported = importCourseInfosJson(jsonEncode(source.toJson()));
       final rebuilt = buildTimetable(
@@ -256,6 +276,10 @@ void main() {
       );
 
       expect(rebuilt.scheduleChanges.single.targetDate, DateTime(2026, 9, 17));
+      expect(
+        rebuilt.academicCalendarEvents.single.startDate,
+        DateTime(2026, 9, 17),
+      );
     });
 
     test('只有补课没有常规时段的备份也能完整恢复', () {

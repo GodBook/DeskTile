@@ -26,6 +26,9 @@ CsesExport exportCses(Timetable timetable) {
   if (timetable.scheduleChanges.isNotEmpty) {
     warnings.add('临时调课、停课和补课无法用 CSES 表达，未写入导出文件；JSON 备份会完整保留');
   }
+  if (timetable.academicCalendarEvents.isNotEmpty) {
+    warnings.add('学期校历和批量停课无法用 CSES 表达，未写入导出文件；JSON 备份会完整保留');
+  }
 
   final all = allWeeks(timetable.totalWeeks);
   final odd = oddWeeks(timetable.totalWeeks);

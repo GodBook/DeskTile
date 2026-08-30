@@ -1,3 +1,5 @@
+import 'academic_calendar.dart';
+import 'models/academic_calendar_event.dart';
 import 'models/course.dart';
 import 'models/schedule_change.dart';
 import 'models/time_slot.dart';
@@ -10,6 +12,7 @@ enum SessionOccurrenceKind {
   rescheduledSource,
   rescheduledTarget,
   extraClass,
+  calendarSuspended,
 }
 
 /// 一个上课时段 + 它对应的课程 + 起止节次的时间，界面和提醒都直接用这个。
@@ -21,6 +24,7 @@ class ResolvedSession {
     required this.endSlot,
     this.occurrence = SessionOccurrenceKind.regular,
     this.change,
+    this.calendarEvent,
   });
 
   final CourseSession session;
@@ -29,10 +33,12 @@ class ResolvedSession {
   final TimeSlot endSlot;
   final SessionOccurrenceKind occurrence;
   final ScheduleChange? change;
+  final AcademicCalendarEvent? calendarEvent;
 
   bool get isInactive =>
       occurrence == SessionOccurrenceKind.cancelled ||
-      occurrence == SessionOccurrenceKind.rescheduledSource;
+      occurrence == SessionOccurrenceKind.rescheduledSource ||
+      occurrence == SessionOccurrenceKind.calendarSuspended;
 
   int get startMinutes => startSlot.startMinutes;
   int get endMinutes => endSlot.endMinutes;
@@ -59,6 +65,7 @@ ResolvedSession? resolve(
   CourseSession s, {
   SessionOccurrenceKind occurrence = SessionOccurrenceKind.regular,
   ScheduleChange? change,
+  AcademicCalendarEvent? calendarEvent,
 }) {
   final course = t.courseById(s.courseId);
   final startSlot = t.slotAt(s.startSection);
@@ -71,6 +78,7 @@ ResolvedSession? resolve(
     endSlot: endSlot,
     occurrence: occurrence,
     change: change,
+    calendarEvent: calendarEvent,
   );
 }
 
@@ -95,6 +103,7 @@ List<ResolvedSession> sessionsOnDate(
   final weekDay = weekDayOfDate(t.termStart, date, t.totalWeeks);
   if (weekDay == null) return const [];
   final result = <ResolvedSession>[];
+  final calendarSuspension = classSuspensionOnDate(t, date);
   for (final s in t.sessions) {
     if (s.day != weekDay.day || !s.activeInWeek(weekDay.week)) continue;
     ScheduleChange? sourceChange;
@@ -114,6 +123,18 @@ List<ResolvedSession> sessionsOnDate(
           s,
           occurrence: occurrence,
           change: sourceChange,
+        );
+        if (resolved != null) result.add(resolved);
+      }
+      continue;
+    }
+    if (calendarSuspension != null) {
+      if (includeChangedSources) {
+        final resolved = resolve(
+          t,
+          s,
+          occurrence: SessionOccurrenceKind.calendarSuspended,
+          calendarEvent: calendarSuspension,
         );
         if (resolved != null) result.add(resolved);
       }

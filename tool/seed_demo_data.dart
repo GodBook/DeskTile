@@ -3,6 +3,7 @@
 // 用法（在项目根目录）：
 //   dart run tool/seed_demo_data.dart
 //   dart run tool/seed_demo_data.dart --weeks-back 1     # 让「本周」落在第 2 周，验证单双周
+//   dart run tool/seed_demo_data.dart --calendar-preview # 加入校历事件，验证批量停课界面
 //   dart run tool/seed_demo_data.dart --reminder-test    # 造一节 3 分钟后开始的课，验证提醒真的会弹
 //   dart run tool/seed_demo_data.dart --export-cses out.yaml  # 导出 CSES，便于用官方 schema 校验
 //   dart run tool/seed_demo_data.dart --dir "C:\path"
@@ -17,6 +18,7 @@ import 'package:desktile/core/import/course_info_dto.dart';
 import 'package:desktile/core/import/csv_importer.dart';
 import 'package:desktile/core/import/exporter.dart';
 import 'package:desktile/core/models/course.dart';
+import 'package:desktile/core/models/academic_calendar_event.dart';
 import 'package:desktile/core/models/exam.dart';
 import 'package:desktile/core/models/settings.dart';
 import 'package:desktile/core/models/time_slot.dart';
@@ -37,7 +39,10 @@ void main(List<String> args) {
 
   final data = args.contains('--reminder-test')
       ? _reminderTestData()
-      : _demoData(weeksBack);
+      : _demoData(
+          weeksBack,
+          calendarPreview: args.contains('--calendar-preview'),
+        );
 
   final exportIndex = args.indexOf('--export-cses');
   if (exportIndex >= 0 && exportIndex + 1 < args.length) {
@@ -53,25 +58,28 @@ void main(List<String> args) {
   final dir = Directory(dirPath)..createSync(recursive: true);
   final file = File('${dir.path}\\desktile_data.json');
   file.writeAsBytesSync(
-      utf8.encode(const JsonEncoder.withIndent('  ').convert(data.toJson())));
+    utf8.encode(const JsonEncoder.withIndent('  ').convert(data.toJson())),
+  );
 
   final t = data.activeTimetable!;
   stdout.writeln('已写入 ${file.path}');
-  stdout.writeln('课表「${t.name}」：课程 ${t.courses.length} 门，时段 ${t.sessions.length} 个，'
-      '学期第一周周一 ${t.termStart.toIso8601String().substring(0, 10)}，'
-      '本周是第 ${clampedWeek(t.termStart, DateTime.now(), t.totalWeeks)} 周');
+  stdout.writeln(
+    '课表「${t.name}」：课程 ${t.courses.length} 门，时段 ${t.sessions.length} 个，'
+    '学期第一周周一 ${t.termStart.toIso8601String().substring(0, 10)}，'
+    '本周是第 ${clampedWeek(t.termStart, DateTime.now(), t.totalWeeks)} 周',
+  );
 }
 
-AppData _demoData(int weeksBack) {
+AppData _demoData(int weeksBack, {bool calendarPreview = false}) {
   final csv = utf8.decode(File('docs/示例课表.csv').readAsBytesSync());
   const totalWeeks = 16;
   final imported = importCsv(csv, totalWeeks: totalWeeks);
 
   final warnings = <String>[];
   // 学期第一周的周一默认设成本周周一，这样打开就能看到「本周」有课。
-  final termStart =
-      mondayOf(DateTime.now()).subtract(Duration(days: 7 * weeksBack));
-  final timetable = buildTimetable(
+  final termStart = mondayOf(DateTime.now())
+      .subtract(Duration(days: 7 * weeksBack));
+  final importedTimetable = buildTimetable(
     id: 't1',
     name: '2026 秋季学期',
     termStart: termStart,
@@ -79,6 +87,27 @@ AppData _demoData(int weeksBack) {
     warnings: warnings,
     totalWeeks: totalWeeks,
   );
+  final timetable = calendarPreview
+      ? importedTimetable.copyWith(
+          academicCalendarEvents: [
+            AcademicCalendarEvent(
+              id: 'calendar-preview-holiday',
+              title: '校庆日统一停课',
+              type: AcademicCalendarEventType.holiday,
+              startDate: termStart,
+              endDate: termStart.add(const Duration(days: 1)),
+            ),
+            AcademicCalendarEvent(
+              id: 'calendar-preview-exam',
+              title: '期中考试周',
+              type: AcademicCalendarEventType.examWeek,
+              startDate: termStart.add(const Duration(days: 7)),
+              endDate: termStart.add(const Duration(days: 13)),
+              suspendsClasses: false,
+            ),
+          ],
+        )
+      : importedTimetable;
   for (final w in [...imported.warnings, ...warnings]) {
     stdout.writeln('警告: $w');
   }
@@ -91,18 +120,30 @@ AppData _demoData(int weeksBack) {
       Exam(
         id: 'e1',
         name: '高等数学A 期末',
-        startAt: DateTime(today.year, today.month, today.day, 9)
-            .add(const Duration(days: 12)),
-        endAt: DateTime(today.year, today.month, today.day, 11)
-            .add(const Duration(days: 12)),
+        startAt: DateTime(
+          today.year,
+          today.month,
+          today.day,
+          9,
+        ).add(const Duration(days: 12)),
+        endAt: DateTime(
+          today.year,
+          today.month,
+          today.day,
+          11,
+        ).add(const Duration(days: 12)),
         room: '教三-305',
         seat: '18',
       ),
       Exam(
         id: 'e2',
         name: '线性代数 期末',
-        startAt: DateTime(today.year, today.month, today.day, 14)
-            .add(const Duration(days: 2)),
+        startAt: DateTime(
+          today.year,
+          today.month,
+          today.day,
+          14,
+        ).add(const Duration(days: 2)),
         room: '教三-208',
         seat: '7',
       ),
@@ -142,8 +183,10 @@ AppData _reminderTestData() {
       ),
     ],
   );
-  stdout.writeln('提醒验证：课程 ${formatMinutes(startMinutes)} 开始，'
-      '提醒应在约 ${formatMinutes(startMinutes - 3)} 弹出');
+  stdout.writeln(
+    '提醒验证：课程 ${formatMinutes(startMinutes)} 开始，'
+    '提醒应在约 ${formatMinutes(startMinutes - 3)} 弹出',
+  );
   return AppData(
     timetables: [timetable],
     activeTimetableId: 't1',

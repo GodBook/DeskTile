@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:desktile/core/import/course_info_dto.dart';
 import 'package:desktile/core/import/cses_importer.dart';
 import 'package:desktile/core/import/exporter.dart';
+import 'package:desktile/core/models/academic_calendar_event.dart';
 import 'package:desktile/core/models/schedule_change.dart';
 import 'package:desktile/core/week_math.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -189,6 +190,23 @@ schedules:
         ],
       );
       final result = exportCses(changed);
+      expect(result.warnings.single, contains('JSON 备份'));
+    });
+
+    test('校历事件无法表达时明确提示使用 JSON 备份', () {
+      final changed = t.copyWith(
+        academicCalendarEvents: [
+          AcademicCalendarEvent(
+            id: 'holiday',
+            title: '假期',
+            type: AcademicCalendarEventType.holiday,
+            startDate: DateTime(2026, 10, 1),
+            endDate: DateTime(2026, 10, 7),
+          ),
+        ],
+      );
+      final result = exportCses(changed);
+      expect(result.warnings.single, contains('学期校历'));
       expect(result.warnings.single, contains('JSON 备份'));
     });
 
