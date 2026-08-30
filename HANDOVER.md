@@ -746,8 +746,8 @@ CSES 无法表达单次变更，导出会明确警告并建议改用 JSON，而�
 | Android Release 签名 | `flutter build apk --release` + `aapt` / `apksigner` | APK 60,110,686 字节（Flutter 显示约 57.3 MB），`1.2.7+12`、target API 36、APK v2 通过；SHA-256 `4032DF79FEA31EA53A7200CEDBFB3B0FE87177E41DABA64A88A6A2B9CEF5AB02` |
 | Android AAB | `flutter build appbundle --release` + `jarsigner -verify` | AAB 58,135,384 字节，签名通过；SHA-256 `6F7469F4D36C9A588AB8AC59F462B22235B18B37C758C83FBFE3DD50821E9275` |
 | Android 升级签名连续性 | `apksigner verify --print-certs` 对比旧版与本地 `v1.2.7` APK | 证书 SHA-256 仍为 `6cf11122888df80a18ad75851ed12b280275addfad9a06820403a630c78f7b0c`，允许覆盖安装 |
-| GitHub Release 远端资产 | 下载 `v1.2.6` Release 后与两份 SHA256 校验文件逐项比对 | APK 59,667,798 字节 / `726e03a5690f9f7f73b7be5cc8e27d3fe23cc47ce076259beaa0725a9b2018dc`；AAB 57,844,563 字节 / `65b8284e70f5171427a971eff0af20e21d357851ae4f8bcc84bc85e8c868f689`；Windows Setup 11,332,118 字节 / `48bb27e7119aa89c076d5cc1faa3821ccf6c5f57b9c5237b1092ea755d6b5b71`；APK v2、AAB 签名验证通过 |
-| GitHub Actions | 标签 `v1.2.6` 触发 `.github/workflows/android-release.yml` / `windows-release.yml` | Android Run `33309544980`、Windows Run `33309544972` 均 `completed / success`；Release 为公开正式版（非 draft、非 prerelease） |
+| GitHub Release 远端资产 | 下载 `v1.2.7` Release 后与两份 SHA256 校验文件逐项比对 | APK 60,127,014 字节 / `FE2A59CB6CC45EEBE8E60E5DE0317C37AE34267B5D7B6082A3D5AA5440F4CEC7`；AAB 58,122,210 字节 / `D402F8DCBCBC2B07A305A9CB433E0276F467262779A322521240DEFC65E33480`；Windows Setup 11,364,313 字节 / `18059565A02A0A8328B8E81A09A90355EDC01990B3F6E018C953DB44331B11FB`；APK `1.2.7+12` / target API 36 / v2 签名、AAB JAR 签名均验证通过 |
+| GitHub Actions | 标签 `v1.2.7` 触发 `.github/workflows/android-release.yml` / `windows-release.yml` | Android Run `33314843107`、Windows Run `33314843099` 均 `completed / success`；Release 为公开正式版（非 draft、非 prerelease） |
 | 正式应用图标 | SVG 母版 + Android adaptive/monochrome/legacy + Windows ICO | 已替换 Flutter 默认图标；通知使用独立单色小图标 |
 | Android 手机布局 | Pixel 6 API 36 竖屏 + widget tests | 底部导航、安全区、课表双指缩放/平移、窄屏编辑器均无溢出；见 `docs/screenshots/Android-主界面.png` |
 | Glance 小组件 | Pixel Launcher 添加组件并修改课程 | Provider/实例正常；`RefreshTest / A101` 保存后约 300ms 即时更新，见 `Android-小组件*.png` |
