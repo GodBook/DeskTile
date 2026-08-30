@@ -706,7 +706,9 @@ CSES 无法表达单次变更，导出会明确警告并建议改用 JSON，而�
 | Android 原生测试 | `gradlew :app:testDebugUnitTest` | 3/3 通过；覆盖安装会话回调状态分类 |
 | Windows Release | `tool\flutter-msvc.bat build windows --release` | `1.2.6+11` 构建成功；PE 文件/产品版本均为 `1.2.6+11`；Release 目录 22 个文件、31,685,308 字节 |
 | Windows Setup | Inno Setup 6.7.3 编译 + PE/版本/哈希检查 | 11,333,155 字节；产品版本 `1.2.6`；SHA-256 `097E110FF6FFE47C88FA1253F7DC9B4F339BE6BD9EA804351A8D970BB1D7B6AD` |
-| Windows Release 视觉复核 | 真实 `desktile.exe` + `PrintWindow`；DPI 175% 下逻辑宽度 320/360/800 | 今天页、课程/任务/考试文字均在容器内，标题省略与换行正常，宽屏侧栏无重叠或 `RenderFlex` 溢出；多课表管理与待办提醒交互由 UI 测试覆盖。截图：`docs/screenshots/Windows发布-今天页-320宽.png`、`Windows发布-今天页-360宽.png`、`Windows发布-今天页-800宽.png` |
+| Windows Release 今天页视觉复核 | 真实 `desktile.exe` + `PrintWindow`；DPI 175% 下逻辑宽度 320/360/800 | 课程、截止事项、逾期事项、近期考试、导航和文字换行均正常，无重叠或 `RenderFlex` 溢出；截图：`docs/screenshots/Windows发布-今天页-{320,360,800}宽.png` |
+| Windows Release 多课表视觉复核 | 同一 Release 程序；两张课表；逻辑宽度 320/360/800 | 管理弹窗、新建/复制按钮、课表名称、学期日期、课程数和操作菜单均在容器内，长文本按预期换行或省略；截图：`docs/screenshots/Windows发布-多课表管理-{320,360,800}宽.png` |
+| Windows Release 待办提醒视觉复核 | 同一 Release 程序；含逾期/今天/接下来/无截止日期临时数据；逻辑宽度 320/360/800 | 列表分组、长标题、课程关联、截止/提醒时间、重要标记、操作菜单和新增事项编辑器均无裁切、遮挡或重叠；截图：`docs/screenshots/Windows发布-待办提醒-{320,360,800}宽.png`、`Windows发布-待办编辑器-{320,360,800}宽.png`；检查后已按 SHA-256 恢复原用户数据 |
 | 主窗口渲染 | 灌示例数据后实机运行，`PrintWindow` 抓窗口 | 见 `docs/screenshots/主窗口-周视图.png` |
 | 挂件渲染 | 同上 | 见 `docs/screenshots/桌面挂件.png` |
 | 单双周（第 1 周） | 实机 + 界面测试 | 周二 1-2 节是线性代数（单周） |
