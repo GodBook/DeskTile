@@ -26,7 +26,7 @@ class ExamsPage extends StatelessWidget {
               Text('考试倒计时', style: Theme.of(context).textTheme.titleMedium),
               const Spacer(),
               FilledButton.icon(
-                onPressed: () => _showExamEditor(context),
+                onPressed: () => showExamEditor(context),
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('添加考试'),
               ),
@@ -51,7 +51,8 @@ class ExamsPage extends StatelessWidget {
                               dense: true,
                               title: Text(e.name),
                               subtitle: Text(
-                                  '${monthDayText(e.startAt)} ${hhmm(e.startAt)}'),
+                                '${monthDayText(e.startAt)} ${hhmm(e.startAt)}',
+                              ),
                               trailing: IconButton(
                                 icon: const Icon(Icons.delete_outline),
                                 onPressed: () =>
@@ -82,7 +83,7 @@ class _ExamCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () => _showExamEditor(context, exam: e),
+        onTap: () => showExamEditor(context, exam: e),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
@@ -100,8 +101,9 @@ class _ExamCard extends StatelessWidget {
                         if (e.room != null) e.room!,
                         if (e.seat != null) '座位 ${e.seat}',
                       ].join(' · '),
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.outline),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
                     ),
                     if (e.note != null && e.note!.isNotEmpty)
                       Padding(
@@ -124,9 +126,12 @@ class _ExamCard extends StatelessWidget {
                     ),
                   ),
                   if (!countdown.started)
-                    Text('后开考',
-                        style: theme.textTheme.labelSmall
-                            ?.copyWith(color: theme.colorScheme.outline)),
+                    Text(
+                      '后开考',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
                 ],
               ),
             ],
@@ -137,7 +142,7 @@ class _ExamCard extends StatelessWidget {
   }
 }
 
-Future<void> _showExamEditor(BuildContext context, {Exam? exam}) =>
+Future<void> showExamEditor(BuildContext context, {Exam? exam}) =>
     showDialog<void>(
       context: context,
       builder: (context) => _ExamEditorDialog(exam: exam),
@@ -242,11 +247,15 @@ class _ExamEditorDialogState extends State<_ExamEditorDialog> {
                   Expanded(
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.schedule, size: 18),
-                      label: Text('开考 ${_start.hour.toString().padLeft(2, '0')}:'
-                          '${_start.minute.toString().padLeft(2, '0')}'),
+                      label: Text(
+                        '开考 ${_start.hour.toString().padLeft(2, '0')}:'
+                        '${_start.minute.toString().padLeft(2, '0')}',
+                      ),
                       onPressed: () async {
                         final picked = await showTimePicker(
-                            context: context, initialTime: _start);
+                          context: context,
+                          initialTime: _start,
+                        );
                         if (picked != null) setState(() => _start = picked);
                       },
                     ),
@@ -255,15 +264,21 @@ class _ExamEditorDialogState extends State<_ExamEditorDialog> {
                   Expanded(
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.schedule_outlined, size: 18),
-                      label: Text(_end == null
-                          ? '结束（可选）'
-                          : '结束 ${_end!.hour.toString().padLeft(2, '0')}:'
-                              '${_end!.minute.toString().padLeft(2, '0')}'),
+                      label: Text(
+                        _end == null
+                            ? '结束（可选）'
+                            : '结束 ${_end!.hour.toString().padLeft(2, '0')}:'
+                                  '${_end!.minute.toString().padLeft(2, '0')}',
+                      ),
                       onPressed: () async {
                         final picked = await showTimePicker(
                           context: context,
-                          initialTime: _end ??
-                              TimeOfDay(hour: _start.hour + 2, minute: _start.minute),
+                          initialTime:
+                              _end ??
+                              TimeOfDay(
+                                hour: _start.hour + 2,
+                                minute: _start.minute,
+                              ),
                         );
                         if (picked != null) setState(() => _end = picked);
                       },
@@ -306,8 +321,10 @@ class _ExamEditorDialogState extends State<_ExamEditorDialog> {
               await AppScope.read(context).deleteExam(widget.exam!.id);
               if (context.mounted) Navigator.of(context).pop();
             },
-            child: Text('删除',
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            child: Text(
+              '删除',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
@@ -318,4 +335,3 @@ class _ExamEditorDialogState extends State<_ExamEditorDialog> {
     );
   }
 }
-

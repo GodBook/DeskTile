@@ -58,12 +58,14 @@ List<PlannedReminder> buildReminders({
           .startOn(item.date)
           .subtract(Duration(minutes: settings.leadMinutes));
       if (!fireAt.isAfter(from)) continue;
-      result.add(PlannedReminder(
-        id: reminderId(item.date, item.session.session.id),
-        fireAt: fireAt,
-        title: _title(settings.reminderMode, item),
-        body: _body(item),
-      ));
+      result.add(
+        PlannedReminder(
+          id: reminderId(item.date, item.session.session.id),
+          fireAt: fireAt,
+          title: _title(settings.reminderMode, item),
+          body: _body(item),
+        ),
+      );
     }
   }
   result.sort((a, b) => a.fireAt.compareTo(b.fireAt));
@@ -88,5 +90,5 @@ String _body(DatedSession item) {
 
 /// 决定性通知 id（限制在 31 位内，Android 要求 32 位 int）。
 int reminderId(DateTime date, String sessionId) =>
-    stableHash('${date.year}-${date.month}-${date.day}|$sessionId');
-
+    stableHash('${date.year}-${date.month}-${date.day}|$sessionId') &
+    0x3fffffff;

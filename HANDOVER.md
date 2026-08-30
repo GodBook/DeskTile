@@ -1,24 +1,24 @@
 # DeskTile 课表岛 — 项目交接文档
 
-> 最后更新：2026-08-29 · 当前状态：Phase 1（Windows）完成 + Phase 2（Android）完成
+> 最后更新：2026-08-30 · 当前状态：Phase 1（Windows）完成 + Phase 2（Android）完成
 > 代码位置：`D:\CLAUDE\DeskTile`（原中文目录 `D:\CLAUDE\DeskTile课表岛` 未使用，见 §1.2）
-> 仓库：https://github.com/GodBook/DeskTile （公开）· 当前发布与源码版本：`v1.2.3`
-> 规模：`lib/` 50 个文件，`test/` 16 个文件 / 170 个 Flutter 用例 + 3 个 Android 原生用例
+> 仓库：https://github.com/GodBook/DeskTile （公开）· 当前发布与源码版本：`v1.2.6`
+> 规模：`lib/` 55 个文件，`test/` 19 个文件 / 191 个 Flutter 用例 + 3 个 Android 原生用例
 
 ---
 
 ## 0. 现状一句话
 
-**Windows 端**功能完整、Release 构建通过、170 个 Flutter 测试全绿、实机跑过并截图；
+**Windows 端**功能完整、Release 构建通过、191 个 Flutter 测试全绿、实机跑过并截图；
 唯一已知缺陷是 Toast 弹窗在本机 Windows 11 26200 上不显示（排定逻辑正确，见 §8）。
 
 **Android 端 Phase 2 已完成**：单 Activity 手机界面、Jetpack Glance 主屏小组件、
 30 分钟后台刷新、IANA 本地时区精准提醒、每日重排和开机恢复均已落地。
 API 36 模拟器已验证小组件即时刷新、10 秒通知、精准闹钟、重启恢复和原生应用详情入口；
-`v1.2.3` Release 提供正式签名 APK、AAB、Windows x64 Setup 和校验文件；此前已补齐 Windows
+`v1.2.6` Release 提供正式签名 APK、AAB、Windows x64 Setup 和校验文件；此前已补齐 Windows
 应用内更新、x64 Setup、自动发布、课表 `Ctrl + 滚轮` 缩放，以及双端共用的
-临时调课 / 停课 / 补课和作业待办。本版将 Android 更新改为 `PackageInstaller Session`，
-修复部分 ROM 把 APK 交给文件管理器后提示“打开目标文件夹失败”的问题。
+临时调课 / 停课 / 补课和作业待办。`v1.2.6` 新增多课表管理与学期归档、作业/待办截止提醒、
+默认“今天”日程页及手机“更多”导航；`v1.2.3` 起 Android 更新使用 `PackageInstaller Session`。
 
 **下次接手的第一件事**：继续做 §10.5 的国产 ROM 真机后台可靠性验证并确定 Play App Signing。
 
@@ -31,12 +31,12 @@ API 36 模拟器已验证小组件即时刷新、10 秒通知、精准闹钟、�
 | git 仓库 | 已建（`master` 分支，已配置 GitHub 远端） |
 | 远端 | `git@github.com:GodBook/DeskTile.git`（**SSH，不是 HTTPS**，原因见下） |
 | 提交身份 | 仓库级占位身份 `DeskTile Dev <dev@localhost>`，**全局 git config 未被改动** |
-| 标签 | `v1.0.0`（Windows 首发）、`v1.1.0`（Android Phase 2）、`v1.1.1`（线上更新与课表缩放）、`v1.1.2`（安装器兼容性修复）、`v1.2.2`（Windows 更新、临时课程变更、作业待办）、`v1.2.3`（Android 系统安装会话修复） |
-| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.2.3 · Android APK/AAB、Windows x64 Setup 与校验文件 |
-| 当前源码 | `1.2.3+8`；`v1.2.3` 通过 Android/Windows 发布工作流构建 |
+| 标签 | `v1.0.0`（Windows 首发）、`v1.1.0`（Android Phase 2）、`v1.1.1`（线上更新与课表缩放）、`v1.1.2`（安装器兼容性修复）、`v1.2.2`（Windows 更新、临时课程变更、作业待办）、`v1.2.3`（Android 系统安装会话修复）、`v1.2.6`（多课表、待办提醒、今天页） |
+| Release | https://github.com/GodBook/DeskTile/releases/tag/v1.2.6 · Android APK/AAB、Windows x64 Setup 与校验文件 |
+| 当前源码 | `1.2.6+11`；`v1.2.6` 通过 Android/Windows 发布工作流构建 |
 
 版本规则：以后每新增一个独立功能，补丁版本加 1、构建号也加 1。例如下一项新功能从
-`1.2.3+8` 迭代到 `1.2.4+9`；修复版本按实际发布需要单独递增。
+`1.2.6+11` 迭代到 `1.2.7+12`；修复版本按实际发布需要单独递增。
 
 **为什么 remote 是 SSH**：本机 `github.com:443` 被墙（20 秒超时），
 但 `github.com:22` 和 `ssh.github.com:443` 都通，`~/.ssh/id_ed25519` 也早就绑好了
@@ -138,7 +138,7 @@ repositories 策略冲突。DeskTile 已验证可用的隔离目录是
 
 ```bash
 tool/flutter-msvc.bat analyze                  # 静态检查，目前 0 问题
-tool/flutter-msvc.bat test                     # 全部 170 个测试
+tool/flutter-msvc.bat test                     # 全部 191 个测试
 tool/flutter-msvc.bat test test/ui_test.dart   # 只跑界面测试
 tool/flutter-msvc.bat run -d windows           # 调试运行（主窗口模式）
 tool/flutter-msvc.bat build windows --release  # 出包
@@ -151,7 +151,7 @@ Dart 代码在 `data\app.so`，插件 DLL 和 `data\flutter_assets\` 都要带�
 
 ```powershell
 & 'C:\Users\awxds\Documents\SuperMemo\.tools\InnoSetup\ISCC.exe' `
-  /DAppVersion=1.2.3 installer\DeskTile.iss
+  /DAppVersion=1.2.6 installer\DeskTile.iss
 ```
 
 Android 构建固定使用以下环境（PowerShell）：
@@ -217,11 +217,13 @@ Android 依赖方面，`maven.google.com` 在本机仍会超时，但 `google()`
   调课 / 补课可选日期、节次和教室并提示冲突，周视图显示停课、调出、调课、补课状态
 - **节次时间表**：可增删改每一节的起止时间，可一键恢复默认 12 节
 - **桌面挂件**：见 §6.3
-- **早八教室提醒**：见 §6.2
+- **今天页**：默认首页统一展示当前/下一节、当天课程、今天截止与逾期待办和最近三场考试，见 §6.9
+- **多课表与归档**：新建、复制、重命名、切换、归档、恢复和删除，见 §6.9
+- **课程与待办提醒**：见 §6.2
 - **考试倒计时**：科目 / 日期 / 开考-结束 / 考场 / 座位 / 备注；按开考时间升序，
   3 天内变红，考完的收进「已结束（N）」折叠区
 - **作业与待办**：作业/待办类型、课程关联、重要标记、截止日期和时间、备注、完成/恢复、
-  编辑和删除；按逾期、今天、接下来、无截止日期、已完成分组，并支持待完成/已完成/全部筛选
+  编辑和删除；按逾期、今天、接下来、无截止日期、已完成分组，并支持截止提醒与 10 分钟后再次提醒
 - **导入**：CSV、CSES v2 YAML、ICS、小爱课程表 JSON，见 §6.4
 - **导出**：CSES v2 YAML、完整备份 JSON、CSV 模板（带 UTF-8 BOM，Excel 打开不乱码）
 - **开机自启**：写 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`，
@@ -232,8 +234,8 @@ Android 依赖方面，`maven.google.com` 在本机仍会超时，但 `google()`
 
 ### 2.2 已实现（Android）
 
-- **手机界面**：底部五栏导航、状态栏/手势区 `SafeArea`、课表双指缩放与平移、320px 窄屏课程编辑器
-- **作业与待办**：与 Windows 共用模型、页面和本地 JSON 数据，窄屏编辑器已覆盖 320px 布局
+- **手机界面**：默认“今天”页、底部五栏与“更多”页、状态栏/手势区 `SafeArea`、课表双指缩放与平移、320px 窄屏课程编辑器
+- **作业与待办**：与 Windows 共用模型、页面和本地 JSON 数据，包含截止提醒和稍后提醒操作
 - **临时课程变更**：与 Windows 共用模型和弹窗；长按空白格添加补课，停课 / 调课入口位于常规课程编辑框
 - **主屏小组件**：Glance 展示周次、下一节、教室、今日剩余和最近考试；支持从应用请求固定到主屏
 - **数据刷新**：课表保存后约 300ms 内刷新小组件，前台每分钟刷新倒计时，后台每 30 分钟刷新
@@ -254,9 +256,8 @@ Android 依赖方面，`maven.google.com` 在本机仍会超时，但 `google()`
 | 项 | 状态 |
 |---|---|
 | 教务系统直连（登录 + 抓课表） | Phase 3，见 §11。解析通路已预留 |
-| 多张课表切换 | 数据结构支持（`timetables` 是数组、有 `activeTimetableId`），界面没做入口 |
 | 常规课程冲突提示 | 临时调课 / 补课已提示冲突；常规重复课程编辑器尚未接冲突提示 |
-| Android 发布准备 | `v1.2.3` 正式 APK/AAB 已发布；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
+| Android 发布准备 | `v1.2.6` 正式 APK/AAB 已发布；尚未在国产 ROM 真机验证后台白名单，也未确定 Play App Signing |
 
 ---
 
@@ -356,6 +357,8 @@ Flutter Windows 的透明窗口有已知的发黑问题。现在的做法是
 | `stable_hash.dart` | 12 | 跨进程稳定的字符串哈希（31 位内，Android 通知 id 要求 32 位 int） |
 | `agenda.dart` | 215 | `ResolvedSession`、`sessionsOnDate`、`sessionsOnWeekDay`、`agendaForDate` 等；统一应用临时变更，周视图可保留停课/调出来源 |
 | `reminder_plan.dart` | 92 | `buildReminders()` → `PlannedReminder` 列表，见 §6.2 |
+| `task_reminder_plan.dart` | 59 | 作业与待办提醒计划、课程正文和独立通知 id 命名空间 |
+| `today_overview.dart` | 41 | 聚合今天课程、今天/逾期待办和最近三场考试 |
 | `exam_countdown.dart` | 59 | `upcomingExams` / `pastExams` / `formatRemaining` |
 | `task_query.dart` | 52 | 作业待办的五类分组、显示顺序和最近截止查询 |
 | `widget_payload.dart` | 159 | 组装 Android 小组件所需的紧凑 JSON：周次、下一节、今日剩余、最近考试；纯 Dart、可测试 |
@@ -376,9 +379,9 @@ Flutter Windows 的透明窗口有已知的发黑问题。现在的做法是
 
 | 文件 | 行 | 职责 |
 |---|---|---|
-| `app_data.dart` | 81 | `AppData`（课表、考试、作业待办、设置）+ `toJson`/`fromJson`/`initial`，当前 `schemaVersion = 3`。**刻意不依赖 Flutter 和 path_provider** |
+| `app_data.dart` | 84 | `AppData`（课表、考试、作业待办、设置）+ `toJson`/`fromJson`/`initial`，当前 `schemaVersion = 4`。**刻意不依赖 Flutter 和 path_provider** |
 | `store.dart` | 88 | `DataStore`：定位目录、原子写（tmp + rename）、损坏兜底（备份成 `.broken`）、`watch()` 文件监听（300ms 防抖）；`newId()` |
-| `app_state.dart` | 166 | `AppState`（ChangeNotifier）+ `AppScope`（InheritedNotifier）。除课表、考试和设置写入外，提供任务新增/更新、完成/恢复、删除和备份替换 |
+| `app_state.dart` | 259 | `AppState`（ChangeNotifier）+ `AppScope`（InheritedNotifier）。提供多课表切换/归档/删除、任务提醒/稍后提醒和安全跨进程写入 |
 | `widget_position.dart` | 47 | 挂件位置单独存 `widget_pos.json` |
 
 ### `lib/platform/` — 平台集成
@@ -387,7 +390,7 @@ Flutter Windows 的透明窗口有已知的发黑问题。现在的做法是
 |---|---|---|
 | `desktop_window.dart` | 87 | `isWidgetMode(args)`、`setupMainWindow()`、`setupWidgetWindow()`、`applyWidgetAppearance()`、`defaultWidgetPosition()`（贴主屏右下角）、两种挂件尺寸常量 |
 | `tray.dart` | 121 | 托盘图标与菜单（显示/隐藏挂件、迷你模式、贴桌面、打开主窗口、开机自启、退出）；左键点图标显示挂件、右键弹菜单 |
-| `notifications.dart` | 202 | 跨平台 `ReminderService`；Windows 注册 AUMID，Android 读取 IANA 时区并请求通知/精准闹钟权限 |
+| `notifications.dart` | 263 | 跨平台 `ReminderService`；统一排课程和待办通知，处理 10 分钟后提醒操作；Windows 注册 AUMID，Android 使用 IANA 时区 |
 | `autostart.dart` | 29 | 读写 `Run` 键 |
 | `windows_registry.dart` | 50 | 直接调 `reg.exe` 的极简封装。**没用 `win32_registry`**，因为它依赖的 win32 版本和 `file_picker 12` 冲突 |
 | `single_instance.dart` | 95 | 绑定回环端口当互斥锁（挂件 45677 / 主窗口 45678），兼作「唤起已有窗口」的 IPC；`ModeLauncher` 启动另一种模式的进程 |
@@ -403,16 +406,19 @@ Flutter Windows 的透明窗口有已知的发黑问题。现在的做法是
 | 文件 | 行 | 职责 |
 |---|---|---|
 | `theme.dart` | 57 | M3 主题、10 色课程配色板、`courseColor(seed)`、日期/时刻格式化 |
-| `app.dart` | 140 | 主界面壳：课表、待办、考试、导入导出、设置五个入口；宽屏 `NavigationRail`，手机底部 `NavigationBar` |
+| `app.dart` | 181 | 主界面壳：默认进入今天；宽屏六个入口，手机五栏加“更多”二级页 |
+| `pages/today_page.dart` | 520 | 今天时间轴、当前/下一节、截止事项、近期考试及就地编辑入口 |
+| `pages/more_page.dart` | 54 | 手机端导入导出与设置二级入口 |
+| `pages/timetable_manager.dart` | 284 | 多课表切换、新建、复制、重命名、归档、恢复和删除 |
 | `pages/timetable_page.dart` | 772 | 响应式周视图：Android 双指缩放、Windows `Ctrl + 滚轮` 缩放；显示临时状态，工具栏/长按/右键可添加补课 |
 | `pages/session_editor.dart` | 402 | 常规课程时段编辑弹窗；提供“临时调整本次课程”入口，删除时同步清理关联停课/调课 |
 | `pages/schedule_change_editor.dart` | 421 | 停课 / 调课 / 补课编辑弹窗；日期、节次、教室、课程选择、冲突提示、恢复原安排和删除补课 |
-| `pages/tasks_page.dart` | 702 | 作业待办列表、三段筛选、五类分组及完整新增/编辑弹窗；课程颜色复用课表稳定配色 |
+| `pages/tasks_page.dart` | 945 | 作业待办列表、三段筛选、五类分组、截止提醒选择和 10 分钟后提醒 |
 | `pages/exams_page.dart` | 321 | 考试列表 + 编辑弹窗 |
-| `pages/import_export_page.dart` | 450 | 格式说明、选文件导入、`showImportPreview()`、任务备份恢复与课表关联重绑、三个导出动作 |
-| `pages/settings_page.dart` | 838 | 学期 / 节次 / 提醒 / Android 后台可靠性、主屏小组件、应用更新 / 桌面挂件 / 外观设置 |
+| `pages/import_export_page.dart` | 509 | 格式说明、覆盖/新建课表导入、备份任务追加与 ID/课程重绑、三个导出动作 |
+| `pages/settings_page.dart` | 850 | 学期 / 节次 / 课程与待办提醒 / Android 后台可靠性、主屏小组件、应用更新 / 桌面挂件 / 外观设置 |
 | `widget_app.dart` | 380 | 挂件：`_WidgetSurface`（拖动 + 位置保存 + 20s 刷新计时器）、`_Header`、`_NextUp`、`_TodayList`、`_ExamLine` |
-| `main.dart` | 202 | Android/Windows 启动分流；Android 状态同步；Windows 两种进程与每日重排 |
+| `main.dart` | 216 | Android/Windows 启动分流；状态变化时同步课程与待办提醒；Windows 两种进程与每日重排 |
 
 ---
 
@@ -425,13 +431,13 @@ AppData
  ├─ activeTimetableId
  ├─ timetables: [Timetable]
  │                ├─ termStart（第一周的周一，构造时自动对齐）
- │                ├─ totalWeeks / showWeekend
+ │                ├─ totalWeeks / showWeekend / archived
  │                ├─ timeSlots: [TimeSlot]     第几节 → 起止时刻
  │                ├─ courses:   [Course]       课名 / 教师 / 配色种子
  │                ├─ sessions:  [CourseSession] 星期 + 起止节次 + 周次集合 + 教室
  │                └─ scheduleChanges: [ScheduleChange] 单次停课 / 调课 / 补课
  ├─ exams: [Exam]
- ├─ tasks: [TaskItem]              作业 / 待办、课程关联、截止与完成状态
+ ├─ tasks: [TaskItem]              作业 / 待办、课程关联、截止、提醒与完成状态
  └─ settings: AppSettings
 ```
 
@@ -446,11 +452,11 @@ AppData
 
 ```json
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "activeTimetableId": "t1",
   "timetables": [{
     "id": "t1", "name": "2026 秋季学期",
-    "termStart": "2026-08-17", "totalWeeks": 16, "showWeekend": true,
+    "termStart": "2026-08-17", "totalWeeks": 16, "showWeekend": true, "archived": false,
     "timeSlots": [{"index": 1, "start": "08:00", "end": "08:45"}],
     "courses":   [{"id": "c1214213202", "name": "高等数学A", "teacher": "张伟",
                    "colorSeed": 1553760393}],
@@ -466,9 +472,11 @@ AppData
              "room": "教三-305", "seat": "18"}],
   "tasks": [{"id": "task1", "title": "完成高数习题", "kind": "homework",
              "createdAt": "2026-08-29T09:00:00.000", "dueAt": "2026-08-30T20:00:00.000",
+             "reminderAt": "2026-08-30T18:00:00.000",
              "timetableId": "t1", "courseId": "c1214213202", "priority": "important"}],
   "settings": {"reminderEnabled": true, "reminderMode": "firstClassOfDay",
                "leadMinutes": 30, "earlyClassCutoffMinutes": 540,
+               "taskReminderEnabled": true, "defaultTaskReminderLeadMinutes": 1440,
                "widgetOpacity": 0.95, "widgetForm": "standard",
                "widgetAlwaysOnBottom": true, "autoStart": false, "theme": "system"}
 }
@@ -476,8 +484,8 @@ AppData
 
 另一个文件 `widget_pos.json`：`{"x": 1993.0, "y": 857.0}`（物理像素，挂件位置）。
 
-**迁移策略**：顶层 `schemaVersion` 目前是 3；旧数据缺少 `tasks`、旧课表缺少
-`scheduleChanges` 时都读取为空列表。
+**迁移策略**：顶层 `schemaVersion` 目前是 4；旧数据缺少 `tasks`、旧课表缺少
+`scheduleChanges` 时读取为空列表，缺少 `archived`、`reminderAt` 和待办提醒设置时使用兼容默认值。
 加字段直接在 `fromJson` 里给默认值即可
 （现有代码全部这么写的）；真要破坏性改动就在 `DataStore.load()` 里按 `schemaVersion` 分支。
 解析抛异常时会把坏文件改名成 `.broken` 并回到初始数据，**不会让程序起不来**。
@@ -508,7 +516,7 @@ AppData
 反向的 `formatWeeks()` 会把集合压回 `每周` / `单周` / `双周` / `1-3,5,7-8周`，
 并且和 `parseWeeks` 往返一致（有测试）。
 
-### 6.2 早八提醒
+### 6.2 课程与待办提醒
 
 纯函数 `buildReminders({timetable, settings, from, daysAhead})` 产出
 `PlannedReminder(id, fireAt, title, body)` 列表：
@@ -523,7 +531,11 @@ AppData
 - id 由 `stableHash('年-月-日|sessionId')` 得出，决定性。
 
 `platform/notifications.dart` 负责落地：滚动排未来 7 天，每次都先 `cancelAll()` 再全量写入。
-Windows 在应用/挂件启动、数据变化和每天 00:05 重排；Android 在应用启动、课表变化和
+`task_reminder_plan.dart` 同时把未完成且提醒时间在未来的任务加入计划；待办 id 固定使用
+`0x40000000..0x7fffffff`，与课程通知的低 30 位命名空间隔离。通知正文会带关联课程和截止时间，
+Android/Windows 通知操作都支持“10 分钟后提醒”，挂件进程会先读磁盘最新数据再安全写回。
+
+Windows 在应用/挂件启动、数据变化和每天 00:05 重排；Android 在应用启动、课表/任务变化和
 WorkManager 每日任务中重排。Android 周期任务的唯一名是 `desktile_reminder_refresh_v2`：
 旧版任务的 30 分钟 flex 会把首次执行额外推迟约 23.5 小时，初始化时会先取消 v1 再迁移。
 
@@ -562,8 +574,8 @@ WorkManager 每日任务中重排。Android 周期任务的唯一名是 `desktil
 ### 6.4 导入
 
 四种格式统一先转成 `List<CourseInfoDto>`，再由 `buildTimetable()` 装配。
-**导入是整表覆盖**当前课表，确认前 `showImportPreview()` 会显示解析到多少门课、
-多少个时段、全部警告，并允许调整学期第一周和总周数。
+确认前 `showImportPreview()` 会显示解析到多少门课、多少个时段、全部警告，并允许调整学期第一周
+和总周数。用户可选择覆盖当前课表，或新建课表并保留原表。
 
 | 格式 | 关键点 |
 |---|---|
@@ -572,8 +584,8 @@ WorkManager 每日任务中重排。Android 周期任务的唯一名是 `desktil
 | ICS | 面向「每次课一条 VEVENT」的导出。学期第一周周一 = `mondayOf(最早事件)`；总周数按最晚事件推；节次时间表同样由时间段推算（会给一条警告说明一段可能对应现实的连续两节）；带 `RRULE` 的不展开，给警告 |
 | JSON | 顶层可以是 `{"courseInfos":[...]}` 或直接是数组；`sections` 支持 `[{"section":1}]` 和 `[1]` 两种写法；可选的 `sectionTimes` 会变成节次时间表。这也是本程序备份文件的读入口，完整备份会恢复作业待办并重绑当前课表 ID |
 
-普通 CSV/CSES/ICS/小爱 JSON 只覆盖课表，不管理也不清空现有任务。只有顶层带 `tasks`
-字段的 DeskTile 完整备份会在预览中明确提示，并在确认后替换作业待办列表。
+普通 CSV/CSES/ICS/小爱 JSON 不管理也不清空现有任务。顶层带 `tasks` 字段的 DeskTile 完整备份
+在覆盖模式下替换待办；新建课表模式会追加待办、生成新 ID，并把课程关联重绑到新课表。
 
 ### 6.5 导出
 
@@ -592,7 +604,7 @@ WorkManager 每日任务中重排。Android 周期任务的唯一名是 `desktil
 
 刷新链路有三层：
 
-1. 前台状态保存后 300ms 防抖即时更新；只有课表变化才同时重排提醒
+1. 前台状态保存后 300ms 防抖即时更新；课表、任务或设置变化都会重排提醒
 2. 前台每分钟重算下一节与倒计时
 3. WorkManager 每 30 分钟从磁盘重读；launcher 的 provider 也声明 30 分钟更新周期
 
@@ -621,16 +633,25 @@ CSES 无法表达单次变更，导出会明确警告并建议改用 JSON，而�
 页面按逾期、今天、接下来、无截止日期和已完成分组，排序规则集中在纯 Dart 的
 `task_query.dart`，因此 Windows 和 Android 行为一致且不依赖组件测试。
 
-编辑器支持作业/待办类型、课程、重要标记、截止日期与时间和备注。完成操作只设置
+编辑器支持作业/待办类型、课程、重要标记、截止日期与时间、提醒时间和备注；新事项可默认提前
+一天或两小时提醒，也可关闭或自定义。完成操作只设置
 `completedAt`，恢复时清空它，不改变事项内容。删除与编辑都通过 `AppState` 原子写回 JSON。
-恢复完整备份时，若备份课表 ID 与当前被覆盖课表不同，只重绑指向备份活动课表的任务；
-无课程关联的待办保持不变。
+删除课表时关联待办会保留，但解除课程关联；通知或列表均可把未完成事项推迟 10 分钟提醒。
+
+### 6.9 多课表与“今天”页
+
+`timetable_manager.dart` 提供切换、新建空表、复制、重命名、归档、恢复和删除。归档当前课表时会
+自动切换到其他未归档表；归档唯一课表时创建 ID 唯一的空白表。课表页和今天页标题都是管理入口。
+
+主窗口默认进入 `TodayPage`。宽屏侧栏显示今天、课表、待办、考试、导入导出、设置；手机底栏保留
+今天、课表、待办、考试和更多，后两项工具页从“更多”进入。`today_overview.dart` 负责纯数据聚合，
+今天时间轴会保留停课/调出来源，同时列出调入、补课、今天截止及逾期事项和最近三场考试。
 
 ---
 
 ## 7. 测试
 
-### 7.1 清单（170 个 Flutter 用例 + 3 个 Android 原生用例）
+### 7.1 清单（191 个 Flutter 用例 + 3 个 Android 原生用例）
 
 | 文件 | 用例 | 覆盖什么 |
 |---|---|---|
@@ -638,16 +659,19 @@ CSES 无法表达单次变更，导出会明确警告并建议改用 JSON，而�
 | `weeks_parser_test.dart` | 23 | 各种周次写法（全角逗号、波浪号、`第..周`、单/双、区间写反、越界裁剪、`单双周`）、`formatWeeks` 往返、`compressRanges`、`parseWeekDay`、`parseSections` |
 | `agenda_test.dart` | 15 | 某周某天的课与排序、单双周、上课中/课间/跨天、今日剩余、学期外，以及停课、跨日调课、一次性补课解析 |
 | `reminder_plan_test.dart` | 13 | 早八 / 每节课模式、阈值、正文、排序和通知 id；停课不提醒、调课按目标时间提醒 |
+| `task_reminder_plan_test.dart` | 5 | 待办过滤、排序、课程正文、总开关和通知 id 命名空间 |
+| `today_overview_test.dart` | 3 | 今天的停课/调课/补课来源、今天与逾期待办、最近三场考试 |
 | `exam_countdown_test.dart` | 15 | 排序与过滤、正在考、`examEndAt` 默认 2 小时、`formatRemaining` 各档 |
 | `import_test.dart` | 22 | CSV / ICS / 小爱 JSON；DeskTile 备份保留内部 ID、临时安排和任务、平移学期日期，并覆盖仅剩补课的课表 |
 | `cses_test.dart` | 14 | CSES 导入/导出、官方约束、往返一致；临时安排无法表达时明确给出 JSON 备份警告 |
-| `store_test.dart` | 9 | 初始数据、原子存取、损坏兜底、schema 3、旧数据兼容、临时变更和任务往返、`newId` |
+| `store_test.dart` | 11 | 初始数据、原子存取、损坏兜底、schema 4、归档/提醒旧数据兼容、任务往返、`newId` |
+| `app_state_test.dart` | 4 | 课表归档切换、唯一表归档兜底、删除课表解除任务关联、稍后提醒持久化 |
 | `task_test.dart` | 6 | 任务 JSON、完成/恢复、五类分组、未完成/已完成排序和最近截止查询 |
-| `ui_test.dart` | 18 | 双端布局/缩放、周视图/考试/挂件/导入；临时课程变更；任务窄屏、新增编辑删除、完成恢复及备份替换 |
+| `ui_test.dart` | 22 | 双端布局/缩放、今天页、多课表、手机更多、周视图/考试/挂件/导入；任务提醒默认值与备份两种模式 |
 | `widget_payload_test.dart` | 3 | Android 小组件 payload、学期外兜底，以及停课后不再显示对应课程 |
 | `android_background_test.dart` | 3 | 本地 00:05 前后边界，以及午夜前的次日延迟计算 |
-| `reminder_permission_policy_test.dart` | 5 | Android 权限只在开启提醒或明确重新排定时请求，普通设置和非 Android 不请求 |
-| `android_update_test.dart` | 6 | 版本比较、Release APK 筛选、降级拦截、完整下载与 HTTPS 校验 |
+| `reminder_permission_policy_test.dart` | 7 | Android 权限只在开启课程/待办提醒或明确重新排定时请求，普通设置和非 Android 不请求 |
+| `android_update_test.dart` | 7 | 回退版本、版本比较、Release APK 筛选、降级拦截、完整下载与 HTTPS 校验 |
 | `windows_update_test.dart` | 6 | 安装目录参数、设置页入口、x64 Setup 筛选、PE 文件头、临时文件清理与 SHA-256 拦截 |
 | `UpdateInstallReceiverTest.kt` | 3 | 系统安装会话待确认、成功与失败状态分类 |
 
@@ -678,10 +702,11 @@ CSES 无法表达单次变更，导出会明确警告并建议改用 JSON，而�
 | 项 | 怎么验的 | 结果 |
 |---|---|---|
 | 静态检查 | `flutter analyze` | 0 问题（含 lint info） |
-| 单元/界面测试 | `tool\flutter-msvc.bat test` | 170/170 通过 |
+| 单元/界面测试 | `tool\flutter-msvc.bat test` | 191/191 通过 |
 | Android 原生测试 | `gradlew :app:testDebugUnitTest` | 3/3 通过；覆盖安装会话回调状态分类 |
-| Windows Release | `tool\flutter-msvc.bat build windows --release` | `1.2.3+8` 构建成功；PE 文件/产品版本均为 `1.2.3+8` |
-| Windows Setup | Inno Setup 6.7.3 编译 + PE/版本/哈希检查 | 11,295,207 字节；产品版本 `1.2.3`；SHA-256 `b973cde9…f4573` |
+| Windows Release | `tool\flutter-msvc.bat build windows --release` | `1.2.6+11` 构建成功；PE 文件/产品版本均为 `1.2.6+11`；Release 目录 22 个文件、31,685,308 字节 |
+| Windows Setup | Inno Setup 6.7.3 编译 + PE/版本/哈希检查 | 11,333,155 字节；产品版本 `1.2.6`；SHA-256 `097E110FF6FFE47C88FA1253F7DC9B4F339BE6BD9EA804351A8D970BB1D7B6AD` |
+| Windows Release 视觉复核 | 真实 `desktile.exe` + `PrintWindow`；DPI 175% 下逻辑宽度 320/360/800 | 今天页、课程/任务/考试文字均在容器内，标题省略与换行正常，宽屏侧栏无重叠或 `RenderFlex` 溢出；多课表管理与待办提醒交互由 UI 测试覆盖。截图：`docs/screenshots/Windows发布-今天页-320宽.png`、`Windows发布-今天页-360宽.png`、`Windows发布-今天页-800宽.png` |
 | 主窗口渲染 | 灌示例数据后实机运行，`PrintWindow` 抓窗口 | 见 `docs/screenshots/主窗口-周视图.png` |
 | 挂件渲染 | 同上 | 见 `docs/screenshots/桌面挂件.png` |
 | 单双周（第 1 周） | 实机 + 界面测试 | 周二 1-2 节是线性代数（单周） |
@@ -692,9 +717,9 @@ CSES 无法表达单次变更，导出会明确警告并建议改用 JSON，而�
 | CSES 导出正确性 | 导出后用官方 `cses.schema.json`（draft-07）+ `jsonschema` 校验 | PASS；`docs/示例课表.cses.yaml` 也 PASS |
 | CSES 往返 | `cses_test.dart` | 导出再导入，星期/周次/节次数量一致 |
 | Android Debug 构建 | 专用 `GRADLE_USER_HOME` + `flutter build apk --debug` | 成功，APK 约 180 MB，可覆盖安装到 API 36 模拟器 |
-| Android Release 签名 | `flutter build apk --release` + `aapt` / `apksigner` | APK 59,355,638 字节（Flutter 显示 56.6 MB），`1.2.3+8`、target API 36、APK v2 通过；SHA-256 `86dbfa14…0173` |
-| Android AAB | `flutter build appbundle --release` + `jarsigner -verify` | AAB 57,562,443 字节，签名通过；SHA-256 `7511a59f…4395` |
-| Android 升级签名连续性 | 对比 `v1.2.2` 与本地 `v1.2.3` APK 证书 | SHA-256 同为 `6cf11122…7b0c`，允许覆盖安装 |
+| Android Release 签名 | `flutter build apk --release` + `aapt` / `apksigner` | APK 59,667,854 字节（Flutter 显示约 56.9 MB），`1.2.6+11`、target API 36、APK v2 通过；SHA-256 `5BBC4D65CA4B6C4D2452ED0546550DB2352095B3AE73EEAA3FFFA00B7849C9C5` |
+| Android AAB | `flutter build appbundle --release` + `jarsigner -verify` | AAB 57,876,677 字节，签名通过；SHA-256 `7681068F94945DF80E840D4F20EC68851942D44CDF068DB151DD94D66649694D` |
+| Android 升级签名连续性 | `apksigner verify --print-certs` 对比 `v1.2.2` 与本地 `v1.2.6` APK | 证书 SHA-256 同为 `6cf11122888df80a18ad75851ed12b280275addfad9a06820403a630c78f7b0c`，允许覆盖安装 |
 | 正式应用图标 | SVG 母版 + Android adaptive/monochrome/legacy + Windows ICO | 已替换 Flutter 默认图标；通知使用独立单色小图标 |
 | Android 手机布局 | Pixel 6 API 36 竖屏 + widget tests | 底部导航、安全区、课表双指缩放/平移、窄屏编辑器均无溢出；见 `docs/screenshots/Android-主界面.png` |
 | Glance 小组件 | Pixel Launcher 添加组件并修改课程 | Provider/实例正常；`RefreshTest / A101` 保存后约 300ms 即时更新，见 `Android-小组件*.png` |

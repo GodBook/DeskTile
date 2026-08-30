@@ -18,6 +18,7 @@ import 'package:desktile/platform/notifications.dart';
 import 'package:desktile/ui/app.dart';
 import 'package:desktile/ui/pages/exams_page.dart';
 import 'package:desktile/ui/pages/import_export_page.dart';
+import 'package:desktile/ui/pages/settings_page.dart';
 import 'package:desktile/ui/pages/tasks_page.dart';
 import 'package:desktile/ui/pages/timetable_page.dart';
 import 'package:desktile/ui/widget_app.dart';
@@ -38,6 +39,8 @@ Future<AppState> _makeState(
   List<Exam> exams = const [],
   List<TaskItem> tasks = const [],
   AppSettings settings = const AppSettings(),
+  List<Timetable>? timetables,
+  String? activeTimetableId,
 }) async {
   late AppState state;
   await tester.runAsync(() async {
@@ -69,10 +72,11 @@ Future<AppState> _makeState(
         ),
       ],
     );
+    final savedTimetables = timetables ?? [withToday];
     await store.save(
       AppData(
-        timetables: [withToday],
-        activeTimetableId: 't1',
+        timetables: savedTimetables,
+        activeTimetableId: activeTimetableId ?? savedTimetables.firstOrNull?.id,
         exams: exams,
         tasks: tasks,
         settings: settings,
@@ -141,7 +145,12 @@ void main() {
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
-    expect(tester.getTopLeft(find.text('测试课表')).dy, greaterThan(24));
+    expect(
+      tester
+          .getTopLeft(find.byKey(const ValueKey('today-timetable-manager')))
+          .dy,
+      greaterThan(24),
+    );
     await tester.tap(find.text('待办'));
     await tester.pumpAndSettle();
     expect(find.text('作业与待办'), findsOneWidget);
@@ -164,6 +173,128 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('主窗口：320px 今天页显示课程、截止事项和考试且无溢出', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.padding = const FakeViewPadding(top: 24);
+    addTearDown(tester.view.reset);
+    final now = DateTime.now();
+    final state = await _makeState(
+      tester,
+      tasks: [
+        TaskItem(
+          id: 'today-task',
+          title: '今天提交实验报告',
+          kind: TaskKind.todo,
+          createdAt: now,
+          dueAt: DateTime(now.year, now.month, now.day, 23, 59),
+        ),
+      ],
+      exams: [
+        Exam(
+          id: 'next-exam',
+          name: '近期测试',
+          startAt: now.add(const Duration(days: 2)),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MainApp(state: state, reminders: ReminderService()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('today-list')), findsOneWidget);
+    expect(find.text('今天的课'), findsWidgets);
+    expect(find.text('今天提交实验报告'), findsOneWidget);
+    expect(find.text('近期测试'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('多课表管理：可以切换并归档当前课表', (tester) async {
+    final first = buildTestTimetable(termStart: mondayOf(DateTime.now()));
+    final second = Timetable(
+      id: 't2',
+      name: '下学期课表',
+      termStart: first.termStart,
+      totalWeeks: first.totalWeeks,
+      timeSlots: first.timeSlots,
+      courses: first.courses,
+      sessions: first.sessions,
+    );
+    final state = await _makeState(
+      tester,
+      timetables: [first, second],
+      activeTimetableId: first.id,
+    );
+    await tester.pumpWidget(
+      MainApp(state: state, reminders: ReminderService()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('today-timetable-manager')));
+    await tester.pumpAndSettle();
+    expect(find.text('管理课表'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('timetable-row-t2')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    await tester.pumpAndSettle();
+    expect(state.activeTimetable?.id, 't2');
+    if (find.text('管理课表').evaluate().isNotEmpty) {
+      await tester.tap(find.widgetWithText(TextButton, '完成'));
+      await tester.pumpAndSettle();
+    }
+
+    await tester.tap(find.byKey(const ValueKey('today-timetable-manager')));
+    await tester.pumpAndSettle();
+    final secondRow = find.byKey(const ValueKey('timetable-row-t2'));
+    await tester.tap(
+      find.descendant(of: secondRow, matching: find.byTooltip('课表操作')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('归档'));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(state.activeTimetable?.id, 't1');
+    expect(
+      state.timetables.singleWhere((item) => item.id == 't2').archived,
+      isTrue,
+    );
+    expect(find.text('已归档'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('手机更多页可以进入导入导出和设置', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    addTearDown(tester.view.reset);
+    final state = await _makeState(tester);
+    await tester.pumpWidget(
+      MainApp(state: state, reminders: ReminderService()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('更多'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(ListTile, '导入导出'), findsOneWidget);
+    expect(find.widgetWithText(ListTile, '设置'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ListTile, '导入导出'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ImportExportPage), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(ListTile, '设置'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsPage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('课程编辑器：窄屏字段能够重排且没有布局溢出', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(320, 700);
@@ -175,6 +306,10 @@ void main() {
       MainApp(state: state, reminders: ReminderService()),
     );
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('课表'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
     await tester.tap(find.text('添加课程'));
     await tester.pumpAndSettle();
 
@@ -439,6 +574,10 @@ void main() {
     expect(state.tasks.single.courseId, 'c1');
     expect(state.tasks.single.priority, TaskPriority.important);
     expect(state.tasks.single.dueAt, isNotNull);
+    expect(
+      state.tasks.single.dueAt!.difference(state.tasks.single.reminderAt!),
+      const Duration(days: 1),
+    );
     expect(find.text('1 项待完成'), findsOneWidget);
     expect(find.text('完成高数习题'), findsOneWidget);
     expect(find.text('高等数学'), findsOneWidget);
@@ -706,5 +845,85 @@ void main() {
     });
     expect(persistedTasks.single.id, 'backup-task');
     expect(persistedTasks.single.timetableId, 't1');
+  });
+
+  testWidgets('导入预览：新建课表会保留原表并追加改写 id 的待办', (tester) async {
+    final existingTask = TaskItem(
+      id: 'existing-task',
+      title: '原有待办',
+      kind: TaskKind.todo,
+      createdAt: DateTime(2026, 8, 28),
+    );
+    final state = await _makeState(tester, tasks: [existingTask]);
+    final source = buildTestTimetable(termStart: mondayOf(DateTime.now()));
+    final backupTimetable = Timetable(
+      id: 'backup-table',
+      name: '备份课表',
+      termStart: source.termStart,
+      totalWeeks: source.totalWeeks,
+      timeSlots: source.timeSlots,
+      courses: source.courses,
+      sessions: source.sessions,
+    );
+    final imported = importCourseInfosJson(
+      jsonEncode({
+        'schemaVersion': 4,
+        'activeTimetableId': backupTimetable.id,
+        'timetables': [backupTimetable.toJson()],
+        'exams': const [],
+        'tasks': [
+          TaskItem(
+            id: 'backup-task',
+            title: '备份里的高数作业',
+            kind: TaskKind.homework,
+            createdAt: DateTime(2026, 8, 29),
+            timetableId: backupTimetable.id,
+            courseId: 'c1',
+          ).toJson(),
+        ],
+        'settings': const {},
+      }),
+    );
+
+    await tester.pumpWidget(
+      _host(
+        state,
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showImportPreview(
+              context,
+              fileName: 'DeskTile-backup.json',
+              imported: imported,
+              base: state.activeTimetable!,
+            ),
+            child: const Text('打开备份预览'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('打开备份预览'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('新建课表'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('当前课表不会改变'), findsOneWidget);
+
+    await _pressAsyncButton(
+      tester,
+      find.widgetWithText(FilledButton, '导入为新课表'),
+    );
+
+    expect(state.timetables, hasLength(2));
+    expect(state.timetables.first.id, 't1');
+    expect(state.timetables.first.name, '测试课表');
+    expect(state.activeTimetable?.id, isNot('t1'));
+    expect(state.activeTimetable?.name, '备份课表');
+    expect(state.tasks, hasLength(2));
+    expect(state.tasks.first.id, 'existing-task');
+    final importedTask = state.tasks.singleWhere(
+      (item) => item.title == '备份里的高数作业',
+    );
+    expect(importedTask.id, isNot('backup-task'));
+    expect(importedTask.timetableId, state.activeTimetable?.id);
+    expect(importedTask.courseId, 'c1');
   });
 }

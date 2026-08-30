@@ -19,9 +19,19 @@ bool shouldRequestAndroidReminderPermissions({
   required bool isAndroid,
   required bool wasEnabled,
   required bool willBeEnabled,
+  bool? wasTaskEnabled,
+  bool? willTaskBeEnabled,
   bool explicitlyRequested = false,
 }) {
-  return isAndroid && (explicitlyRequested || (!wasEnabled && willBeEnabled));
+  final taskBecameEnabled =
+      wasTaskEnabled != null &&
+      willTaskBeEnabled != null &&
+      !wasTaskEnabled &&
+      willTaskBeEnabled;
+  return isAndroid &&
+      (explicitlyRequested ||
+          (!wasEnabled && willBeEnabled) ||
+          taskBecameEnabled);
 }
 
 class SettingsPage extends StatefulWidget {
@@ -63,6 +73,8 @@ class _SettingsPageState extends State<SettingsPage> {
       isAndroid: Platform.isAndroid,
       wasEnabled: state.settings.reminderEnabled,
       willBeEnabled: settings.reminderEnabled,
+      wasTaskEnabled: state.settings.taskReminderEnabled,
+      willTaskBeEnabled: settings.taskReminderEnabled,
       explicitlyRequested: explicitlyRequestPermissions,
     );
     await state.updateSettings(settings);
@@ -71,6 +83,8 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     await widget.reminders.reschedule(
       timetable: state.activeTimetable,
+      timetables: state.timetables,
+      tasks: state.tasks,
       settings: settings,
     );
     await _refreshStatus();
@@ -205,7 +219,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Row(
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   OutlinedButton.icon(
                     onPressed: () async {
@@ -228,11 +244,45 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     label: const Text('10 秒后测试提醒'),
                   ),
-                  const SizedBox(width: 12),
                   TextButton(
                     onPressed: () =>
                         _applySettings(s, explicitlyRequestPermissions: true),
                     child: const Text('重新排定'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        _Section(
+          title: '作业与待办提醒',
+          children: [
+            SwitchListTile(
+              title: const Text('开启待办提醒'),
+              subtitle: const Text('只提醒已单独设置提醒时间且尚未完成的事项'),
+              value: s.taskReminderEnabled,
+              onChanged: (value) =>
+                  _applySettings(s.copyWith(taskReminderEnabled: value)),
+            ),
+            RadioGroup<int>(
+              groupValue: s.defaultTaskReminderLeadMinutes,
+              onChanged: (value) {
+                if (!s.taskReminderEnabled || value == null) return;
+                _applySettings(
+                  s.copyWith(defaultTaskReminderLeadMinutes: value),
+                );
+              },
+              child: Column(
+                children: [
+                  RadioListTile<int>(
+                    value: 24 * 60,
+                    enabled: s.taskReminderEnabled,
+                    title: const Text('新事项默认提前一天'),
+                  ),
+                  RadioListTile<int>(
+                    value: 2 * 60,
+                    enabled: s.taskReminderEnabled,
+                    title: const Text('新事项默认提前两小时'),
                   ),
                 ],
               ),
@@ -758,7 +808,9 @@ class _TimeSlotsSection extends StatelessWidget {
           ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-          child: Row(
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 8,
             children: [
               OutlinedButton.icon(
                 onPressed: () => AppScope.read(context).updateActiveTimetable((
@@ -780,7 +832,6 @@ class _TimeSlotsSection extends StatelessWidget {
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('添加一节'),
               ),
-              const SizedBox(width: 12),
               TextButton(
                 onPressed: () => AppScope.read(context).updateActiveTimetable(
                   (c) => c.copyWith(timeSlots: kDefaultTimeSlots),

@@ -12,8 +12,10 @@ import '../../core/import/exporter.dart';
 import '../../core/import/ics_importer.dart';
 import '../../core/import/json_importer.dart';
 import '../../core/models/timetable.dart';
+import '../../core/models/task_item.dart';
 import '../../core/week_math.dart';
 import '../../data/app_state.dart';
+import '../../data/store.dart';
 
 /// 导入导出页。本期只做文件导入 + 手动录入；教务系统直连留在后续版本，
 /// 解析通路（courseInfos）已经在 core 里备好。
@@ -50,14 +52,15 @@ class ImportExportPage extends StatelessWidget {
                   desc: '小爱课程表 courseInfos 结构，或本程序导出的备份',
                 ),
                 const SizedBox(height: 14),
-                Row(
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
                   children: [
                     FilledButton.icon(
                       onPressed: () => _pickAndImport(context),
                       icon: const Icon(Icons.file_open, size: 18),
                       label: const Text('选择文件导入…'),
                     ),
-                    const SizedBox(width: 12),
                     OutlinedButton.icon(
                       onPressed: () => _saveCsvTemplate(context),
                       icon: const Icon(Icons.download, size: 18),
@@ -240,6 +243,7 @@ class _ImportPreviewDialog extends StatefulWidget {
 class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
   late DateTime _termStart;
   late int _totalWeeks;
+  bool _replaceCurrent = true;
 
   @override
   void initState() {
@@ -253,9 +257,12 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
     final state = AppScope.read(context);
     final navigator = Navigator.of(context);
     final warnings = <String>[...widget.imported.warnings];
+    final timetableId = _replaceCurrent ? widget.base.id : newId('timetable');
     final timetable = buildTimetable(
-      id: widget.base.id,
-      name: widget.imported.name ?? widget.base.name,
+      id: timetableId,
+      name:
+          widget.imported.name ??
+          (_replaceCurrent ? widget.base.name : '${widget.base.name} 导入'),
       termStart: _termStart,
       imported: widget.imported,
       warnings: warnings,
@@ -266,14 +273,18 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
     final importedTasks = widget.imported.tasks;
     if (importedTasks != null) {
       final sourceTimetableId = widget.imported.sourceTimetable?.id;
-      await state.replaceTasks([
+      final mapped = [
         for (final task in importedTasks)
-          if (sourceTimetableId != null &&
-              task.timetableId == sourceTimetableId)
-            task.withTimetableId(timetable.id)
-          else
+          _importedTask(
             task,
-      ]);
+            timetableId: timetable.id,
+            sourceTimetableId: sourceTimetableId,
+            assignNewId: !_replaceCurrent,
+          ),
+      ];
+      await state.replaceTasks(
+        _replaceCurrent ? mapped : [...state.tasks, ...mapped],
+      );
     }
     navigator.pop();
     toast.show(
@@ -304,6 +315,25 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
                 const SizedBox(height: 4),
                 Text('备份包含 ${imported.tasks!.length} 项作业与待办'),
               ],
+              const SizedBox(height: 14),
+              SegmentedButton<bool>(
+                key: const ValueKey('import-mode'),
+                segments: const [
+                  ButtonSegment(
+                    value: true,
+                    icon: Icon(Icons.refresh, size: 18),
+                    label: Text('覆盖当前'),
+                  ),
+                  ButtonSegment(
+                    value: false,
+                    icon: Icon(Icons.add_box_outlined, size: 18),
+                    label: Text('新建课表'),
+                  ),
+                ],
+                selected: {_replaceCurrent},
+                onSelectionChanged: (value) =>
+                    setState(() => _replaceCurrent = value.single),
+              ),
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -366,10 +396,15 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
               ],
               const SizedBox(height: 12),
               Text(
-                '导入会覆盖当前课表「${widget.base.name}」的全部课程'
-                '${imported.tasks == null ? '' : '，并替换作业与待办列表'}。',
+                _replaceCurrent
+                    ? '导入会覆盖当前课表「${widget.base.name}」的全部课程'
+                          '${imported.tasks == null ? '' : '，并替换作业与待办列表'}。'
+                    : '导入会创建一张新课表，当前课表不会改变'
+                          '${imported.tasks == null ? '' : '；备份中的待办会追加到现有列表'}。',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
+                  color: _replaceCurrent
+                      ? theme.colorScheme.error
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -381,11 +416,36 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
-        FilledButton(onPressed: _confirm, child: const Text('导入并覆盖')),
+        FilledButton(
+          onPressed: _confirm,
+          child: Text(_replaceCurrent ? '导入并覆盖' : '导入为新课表'),
+        ),
       ],
     );
   }
 }
+
+TaskItem _importedTask(
+  TaskItem source, {
+  required String timetableId,
+  required String? sourceTimetableId,
+  required bool assignNewId,
+}) => TaskItem(
+  id: assignNewId ? newId('task') : source.id,
+  title: source.title,
+  kind: source.kind,
+  createdAt: source.createdAt,
+  dueAt: source.dueAt,
+  reminderAt: source.reminderAt,
+  timetableId:
+      sourceTimetableId != null && source.timetableId == sourceTimetableId
+      ? timetableId
+      : source.timetableId,
+  courseId: source.courseId,
+  note: source.note,
+  priority: source.priority,
+  completedAt: source.completedAt,
+);
 
 const _csvTemplate =
     '课程名称,教师,教室,星期,节次,周次\n'

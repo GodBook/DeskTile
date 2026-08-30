@@ -8,7 +8,7 @@ import 'release_update.dart';
 const defaultAndroidUpdateUrl = defaultReleaseUpdateUrl;
 
 // 与 pubspec.yaml 保持同步，供测试环境或旧版本原生通道缺失时回退。
-const defaultAndroidVersion = '1.2.3';
+const defaultAndroidVersion = '1.2.6';
 
 const _updateChannel = MethodChannel('com.desktile.desktile/app_update');
 

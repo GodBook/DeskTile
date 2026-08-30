@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -6,8 +7,10 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../core/models/settings.dart';
+import '../core/models/task_item.dart';
 import '../core/models/timetable.dart';
 import '../core/reminder_plan.dart';
+import '../core/task_reminder_plan.dart';
 import 'windows_registry.dart';
 
 /// 早八提醒的调度。
@@ -15,6 +18,10 @@ import 'windows_registry.dart';
 /// 提醒计划由 [buildReminders] 纯函数算出，这里只负责把它变成系统通知：
 /// 每次重排都先 cancelAll 再全量写入，靠 [PlannedReminder.id] 的决定性避免重复。
 class ReminderService {
+  ReminderService({this.onTaskSnooze});
+
+  final Future<void> Function(String taskId)? onTaskSnooze;
+
   static const appName = 'DeskTile 课表岛';
   static const aumid = 'DeskTile.KeBiaoDao.Desktop';
   static const androidNotificationIconResource = 'ic_notification';
@@ -22,6 +29,7 @@ class ReminderService {
 
   /// 一次排多少天。配合每天 00:05 的重排，足够覆盖。
   static const scheduleDays = 7;
+  static const taskSnoozeAction = 'task_snooze_10';
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -77,6 +85,7 @@ class ReminderService {
             iconPath: File(iconPath).existsSync() ? iconPath : null,
           ),
         ),
+        onDidReceiveNotificationResponse: _handleNotificationResponse,
       );
       _ready = ok ?? false;
       if (!_ready) _lastError = '通知插件初始化返回失败';
@@ -85,6 +94,21 @@ class ReminderService {
       _lastError = '$e';
     }
     return _ready;
+  }
+
+  void _handleNotificationResponse(NotificationResponse response) {
+    String? taskId;
+    final action = response.actionId ?? '';
+    if (action == taskSnoozeAction &&
+        response.payload?.startsWith('task:') == true) {
+      taskId = response.payload!.substring('task:'.length);
+    } else if (action.startsWith('$taskSnoozeAction:')) {
+      taskId = action.substring(taskSnoozeAction.length + 1);
+    }
+    final handler = onTaskSnooze;
+    if (taskId != null && taskId.isNotEmpty && handler != null) {
+      unawaited(handler(taskId));
+    }
   }
 
   /// 由设置页的明确用户操作触发。精准闹钟授权可能打开系统设置页，因此
@@ -121,6 +145,8 @@ class ReminderService {
   /// 重排未来几天的提醒。返回实际排上的条数。
   Future<int> reschedule({
     required Timetable? timetable,
+    Iterable<Timetable> timetables = const [],
+    Iterable<TaskItem> tasks = const [],
     required AppSettings settings,
     DateTime? now,
   }) async {
@@ -130,13 +156,20 @@ class ReminderService {
     } catch (e) {
       _lastError = '$e';
     }
-    if (timetable == null || !settings.reminderEnabled) return 0;
-
-    final reminders = buildReminders(
-      timetable: timetable,
+    final instant = now ?? DateTime.now();
+    final reminders = timetable == null
+        ? const <PlannedReminder>[]
+        : buildReminders(
+            timetable: timetable,
+            settings: settings,
+            from: instant,
+            daysAhead: scheduleDays,
+          );
+    final taskReminders = buildTaskReminders(
+      tasks: tasks,
+      timetables: timetables,
       settings: settings,
-      from: now ?? DateTime.now(),
-      daysAhead: scheduleDays,
+      from: instant,
     );
 
     var count = 0;
@@ -149,6 +182,22 @@ class ReminderService {
           scheduledDate: tz.TZDateTime.from(r.fireAt, _scheduleLocation),
           notificationDetails: _details,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        );
+        count++;
+      } catch (e) {
+        _lastError = '$e';
+      }
+    }
+    for (final r in taskReminders) {
+      try {
+        await _plugin.zonedSchedule(
+          id: r.id,
+          title: r.title,
+          body: r.body,
+          scheduledDate: tz.TZDateTime.from(r.fireAt, _scheduleLocation),
+          notificationDetails: _taskDetails(r.taskId),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          payload: 'task:${r.taskId}',
         );
         count++;
       } catch (e) {
@@ -206,6 +255,31 @@ class ReminderService {
       channelDescription: '早八和上课前提醒',
       importance: Importance.max,
       priority: Priority.high,
+    ),
+  );
+
+  static NotificationDetails _taskDetails(String taskId) => NotificationDetails(
+    windows: WindowsNotificationDetails(
+      actions: [
+        WindowsAction(
+          content: '10 分钟后提醒',
+          arguments: '$taskSnoozeAction:$taskId',
+        ),
+      ],
+    ),
+    android: const AndroidNotificationDetails(
+      'desktile_task_reminder',
+      '作业与待办提醒',
+      channelDescription: '作业和待办事项的截止提醒',
+      importance: Importance.max,
+      priority: Priority.high,
+      actions: [
+        AndroidNotificationAction(
+          taskSnoozeAction,
+          '10 分钟后提醒',
+          showsUserInterface: true,
+        ),
+      ],
     ),
   );
 }

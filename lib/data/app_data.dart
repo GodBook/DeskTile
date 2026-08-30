@@ -25,12 +25,15 @@ class AppData {
   final String? activeTimetableId;
   final List<TaskItem> tasks;
 
-  static const schemaVersion = 3;
+  static const schemaVersion = 4;
 
   Timetable? get activeTimetable {
     if (timetables.isEmpty) return null;
     for (final t in timetables) {
-      if (t.id == activeTimetableId) return t;
+      if (t.id == activeTimetableId && !t.archived) return t;
+    }
+    for (final t in timetables) {
+      if (!t.archived) return t;
     }
     return timetables.first;
   }

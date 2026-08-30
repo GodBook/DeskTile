@@ -28,6 +28,7 @@ void main() {
       kind: TaskKind.homework,
       createdAt: DateTime(2026, 9, 8, 9),
       dueAt: DateTime(2026, 9, 10, 23, 59),
+      reminderAt: DateTime(2026, 9, 9, 23, 59),
       timetableId: 't1',
       courseId: 'c1',
       note: '第 1-12 题',
@@ -41,6 +42,7 @@ void main() {
     expect(restored.title, original.title);
     expect(restored.kind, TaskKind.homework);
     expect(restored.dueAt, original.dueAt);
+    expect(restored.reminderAt, original.reminderAt);
     expect(restored.timetableId, 't1');
     expect(restored.courseId, 'c1');
     expect(restored.note, '第 1-12 题');
@@ -49,7 +51,15 @@ void main() {
   });
 
   test('完成与恢复不改变事项本身', () {
-    final original = task(id: 'task1', dueAt: DateTime(2026, 9, 11));
+    final reminderAt = DateTime(2026, 9, 10, 20);
+    final original = TaskItem(
+      id: 'task1',
+      title: 'task1',
+      kind: TaskKind.todo,
+      createdAt: DateTime(2026, 9, 1),
+      dueAt: DateTime(2026, 9, 11),
+      reminderAt: reminderAt,
+    );
     final completedAt = DateTime(2026, 9, 10, 13);
 
     final completed = original.withCompletion(true, at: completedAt);
@@ -59,6 +69,8 @@ void main() {
     expect(restored.isCompleted, isFalse);
     expect(restored.title, original.title);
     expect(restored.dueAt, original.dueAt);
+    expect(completed.reminderAt, reminderAt);
+    expect(restored.reminderAt, reminderAt);
   });
 
   test('事项按逾期、今天、接下来、无截止、已完成分组', () {

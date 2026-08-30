@@ -25,6 +25,32 @@ void main() {
       );
     });
 
+    test('作业待办提醒从关闭切到开启时请求', () {
+      expect(
+        shouldRequestAndroidReminderPermissions(
+          isAndroid: true,
+          wasEnabled: false,
+          willBeEnabled: false,
+          wasTaskEnabled: false,
+          willTaskBeEnabled: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('作业待办提醒已开启时不重复请求', () {
+      expect(
+        shouldRequestAndroidReminderPermissions(
+          isAndroid: true,
+          wasEnabled: false,
+          willBeEnabled: false,
+          wasTaskEnabled: true,
+          willTaskBeEnabled: true,
+        ),
+        isFalse,
+      );
+    });
+
     test('关闭提醒或保持关闭时不请求', () {
       expect(
         shouldRequestAndroidReminderPermissions(

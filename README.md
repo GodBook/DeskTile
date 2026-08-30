@@ -2,9 +2,9 @@
 
 跨 Windows 与 Android 的极简课程表。无广告、无账号、纯本地，冷启动即用。
 
-**当前稳定版本：v1.2.3**。Windows 桌面挂件与 Android
-手机界面、Glance 主屏小组件、精准课程提醒、双端线上更新及作业待办均已完成；
-170 个 Flutter 测试和 3 个 Android 原生测试通过。
+**当前稳定版本：v1.2.6**。Windows 桌面挂件与 Android
+手机界面、Glance 主屏小组件、多课表、今天日程、课程与待办提醒、双端线上更新均已完成；
+191 个 Flutter 测试和 3 个 Android 原生测试通过。
 
 > 接手开发请先读 **[HANDOVER.md](HANDOVER.md)** —— 环境坑、架构决策、文件职责、
 > 验证记录、Phase 2/3 落地步骤和排错手册都在那里。本文件只是使用向导。
@@ -13,15 +13,19 @@
 
 ## 下载
 
-当前稳定版前往 [v1.2.3 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.2.3)：
+当前稳定版前往 [v1.2.6 Release](https://github.com/GodBook/DeskTile/releases/tag/v1.2.6)：
 
-- `DeskTile-v1.2.3-android.apk`：Android 安装包
-- `DeskTile-v1.2.3-android.aab`：应用商店上传包，不能直接安装
-- `DeskTile-v1.2.3-windows-x64-setup.exe`：Windows x64 安装包
-- `DeskTile-v1.2.3-SHA256SUMS.txt`、`DeskTile-v1.2.3-windows-SHA256SUMS.txt`：安装包校验值
+- `DeskTile-v1.2.6-android.apk`：Android 安装包
+- `DeskTile-v1.2.6-android.aab`：应用商店上传包，不能直接安装
+- `DeskTile-v1.2.6-windows-x64-setup.exe`：Windows x64 安装包
+- `DeskTile-v1.2.6-SHA256SUMS.txt`、`DeskTile-v1.2.6-windows-SHA256SUMS.txt`：安装包校验值
 
 ## 已实现（Windows）
 
+- **今天**：默认首页按连续时间轴汇总当前/下一节、当天课程（含停课、调课、补课）、
+  今天截止与逾期待办和最近三场考试，可直接完成或编辑
+- **多课表与归档**：可新建、复制、重命名、切换、归档、恢复和删除课表；导入时可覆盖当前表，
+  也可新建课表并保留原数据
 - **周视图**：节次时间轴 + 周一~周日，今天所在列高亮，课程块按课名稳定配色；
   支持 `Ctrl + 滚轮` 在 65%～250% 之间缩放课表
 - **单双周**：周次是一个集合，「每周 / 单周 / 双周 / 自定义（1-8,10,12-16）」走同一条路径；
@@ -35,8 +39,10 @@
   可切换成「每节课都提醒」；「早八」判定阈值可调（拉到 24:00 就等于每天第一节都提醒）
 - **考试倒计时**：科目 / 时间 / 考场 / 座位，按开考时间排序，考完的自动折叠
 - **作业与待办**：支持课程关联、重要标记、截止日期与时间、备注、完成/恢复、编辑和删除；
-  自动按逾期、今天、接下来、无截止日期和已完成分组
-- **导入**：CSV、CSES v2 YAML、ICS、小爱课程表 `courseInfos` JSON，导入前先给解析预览和警告
+  自动按逾期、今天、接下来、无截止日期和已完成分组；支持提前一天、提前两小时或自定义提醒，
+  通知可一键推迟 10 分钟
+- **导入**：CSV、CSES v2 YAML、ICS、小爱课程表 `courseInfos` JSON，导入前先给解析预览和警告，
+  可选择覆盖当前课表或导入为新课表
 - **导出**：CSES v2 YAML（可被 ClassIsland 等读取）、完整备份 JSON；备份包含作业与待办
 - **开机自启**：写 `HKCU\...\CurrentVersion\Run`，启动的是挂件模式，不需要管理员权限
 - **线上更新**：设置 → 应用更新可检查稳定版、显示发布说明、流式下载安装包并启动覆盖安装；
@@ -53,13 +59,15 @@ GitHub 返回资产 SHA-256 digest 时，客户端会在启动安装器前自动
 
 ## 已实现（Android）
 
-- **手机界面**：底部五栏导航、系统安全区适配、课表双指缩放与平移、320px 窄屏编辑器
+- **手机界面**：默认“今天”页、底部五栏导航与“更多”页、系统安全区适配、课表双指缩放与平移、
+  320px 窄屏编辑器
 - **作业与待办**：与 Windows 共用数据和界面，支持课程关联、重要程度、截止时间、分组筛选及完成状态
 - **临时调课 / 停课 / 补课**：与 Windows 共用数据和编辑器；长按空白格可直接添加补课，
   临时安排会同步影响提醒和主屏小组件
 - **主屏小组件**：Jetpack Glance 展示周次、下一节、教室、今日剩余和最近考试
 - **即时刷新**：课程保存后约 300ms 更新小组件，后台每 30 分钟刷新
-- **精准提醒**：设备 IANA 时区、精准闹钟、锁屏待机调度，通知正文包含教室
+- **精准提醒**：设备 IANA 时区、精准闹钟、锁屏待机调度；课程通知正文包含教室，
+  作业与待办按各自提醒时间调度并支持 10 分钟后再次提醒
 - **系统恢复**：重启后恢复通知计划、WorkManager 周期任务和 Glance 实例
 - **后台引导**：设置页可直达应用详情，便于国产 ROM 配置自启动和省电白名单
 - **线上更新**：设置 → 应用更新可检查 GitHub Release，下载 Android APK 后写入系统 `PackageInstaller`
@@ -100,15 +108,15 @@ tool/flutter-msvc.bat build windows --release
 生成可供线上更新使用的 Inno Setup 安装包（需先安装 Inno Setup 6）：
 
 ```powershell
-& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.2.3 installer\DeskTile.iss
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=1.2.6 installer\DeskTile.iss
 ```
 
-产物：`dist\DeskTile-v1.2.3-windows-x64-setup.exe`
+产物：`dist\DeskTile-v1.2.6-windows-x64-setup.exe`
 
 两种运行模式（同一个 exe）：
 
 ```bash
-desktile.exe            # 主窗口：编辑课表、导入导出、设置
+desktile.exe            # 主窗口：今天、课表、待办、考试、导入导出、设置
 desktile.exe --widget   # 桌面挂件 + 托盘，常驻，负责排提醒
 ```
 
@@ -148,9 +156,9 @@ D:\dev\flutter\bin\flutter.bat build appbundle --release
 提交后执行：
 
 ```powershell
-git tag v1.2.3
 git push origin master
-git push origin v1.2.3
+git tag -a v1.2.6 -m "DeskTile v1.2.6"
+git push origin v1.2.6
 ```
 
 工作流会上传 APK、AAB、Windows x64 Setup 和校验文件；客户端只选择本平台的安装包。
@@ -172,7 +180,8 @@ Windows 工作流目前生成未签名安装器，不需要额外 Secret；Andro
 | `.ics` | 每次课一条 VEVENT 的日历文件。学期第一周周一按最早的事件推算，节次时间表按出现过的时间段推算；带 `RRULE` 的重复事件不展开，会在警告里说明 |
 | `.json` | 小爱课程表的 `{"courseInfos":[...]}` 结构（`sections` 支持 `[{section:1}]` 和 `[1]` 两种写法），或本程序导出的完整备份；DeskTile 备份会保留临时调课、停课、补课、作业待办和内部关联 ID |
 
-导入是**整表覆盖**当前课表，确认前会先显示解析到多少门课、多少个时段以及全部警告。
+导入确认前会先显示解析到多少门课、多少个时段以及全部警告，并可选择**覆盖当前课表**或
+**导入为新课表**。完整备份导入为新课表时，会保留现有待办，并为追加事项生成新 ID、重绑课程。
 CSES/CSV/ICS 本身无法完整表达单次课程变更；需要跨端迁移临时安排时请使用 JSON 备份。
 
 ## 目录结构
@@ -185,8 +194,10 @@ lib/
 │  ├─ weeks_parser.dart  周次串解析与格式化（导入与未来教务解析共用）
 │  ├─ agenda.dart        应用临时变更后的实际日程、下一节、今日剩余
 │  ├─ reminder_plan.dart 提醒计划（决定性 id + 含教室的正文）
+│  ├─ task_reminder_plan.dart 作业与待办提醒计划（独立通知 id 命名空间）
 │  ├─ exam_countdown.dart
 │  ├─ task_query.dart    作业待办分组、排序与最近截止查询
+│  ├─ today_overview.dart 今天页课程、待办与考试聚合
 │  └─ import/            course_info_dto / csv / cses / ics / json / exporter
 ├─ data/                 app_data（纯数据）、store（原子 JSON 读写 + 文件监听）、app_state
 ├─ platform/             Windows 窗口/托盘与 Android 后台任务/小组件桥
@@ -204,7 +215,7 @@ tool/
 
 已实测通过：
 
-- `flutter analyze` 无任何问题；`flutter test` 170 个测试、Android 原生 3 个测试全绿
+- `flutter analyze` 无任何问题；`flutter test` 191 个测试、Android 原生 3 个测试全绿
 - Release 构建成功，主窗口与挂件都实际运行并截图确认
 - Android 正式签名 APK/AAB 构建成功；API 36 模拟器完成通知、小组件、重启恢复验收
 - 单双周：第 1 周显示单周课、第 2 周显示双周课，界面测试与真机截图双向确认

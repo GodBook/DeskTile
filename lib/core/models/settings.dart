@@ -24,6 +24,8 @@ class AppSettings {
     this.reminderMode = ReminderMode.firstClassOfDay,
     this.leadMinutes = 30,
     this.earlyClassCutoffMinutes = 9 * 60,
+    this.taskReminderEnabled = true,
+    this.defaultTaskReminderLeadMinutes = 24 * 60,
     this.widgetOpacity = 0.95,
     this.widgetForm = WidgetForm.standard,
     this.widgetAlwaysOnBottom = true,
@@ -40,6 +42,11 @@ class AppSettings {
   /// 「早八」的判定阈值：第一节课开始时间早于这个时刻才提醒。默认 09:00。
   final int earlyClassCutoffMinutes;
 
+  final bool taskReminderEnabled;
+
+  /// 新建事项默认提前多久提醒。当前界面提供提前一天和提前两小时。
+  final int defaultTaskReminderLeadMinutes;
+
   final double widgetOpacity;
   final WidgetForm widgetForm;
 
@@ -54,51 +61,66 @@ class AppSettings {
     ReminderMode? reminderMode,
     int? leadMinutes,
     int? earlyClassCutoffMinutes,
+    bool? taskReminderEnabled,
+    int? defaultTaskReminderLeadMinutes,
     double? widgetOpacity,
     WidgetForm? widgetForm,
     bool? widgetAlwaysOnBottom,
     bool? autoStart,
     ThemePref? theme,
-  }) =>
-      AppSettings(
-        reminderEnabled: reminderEnabled ?? this.reminderEnabled,
-        reminderMode: reminderMode ?? this.reminderMode,
-        leadMinutes: leadMinutes ?? this.leadMinutes,
-        earlyClassCutoffMinutes:
-            earlyClassCutoffMinutes ?? this.earlyClassCutoffMinutes,
-        widgetOpacity: widgetOpacity ?? this.widgetOpacity,
-        widgetForm: widgetForm ?? this.widgetForm,
-        widgetAlwaysOnBottom: widgetAlwaysOnBottom ?? this.widgetAlwaysOnBottom,
-        autoStart: autoStart ?? this.autoStart,
-        theme: theme ?? this.theme,
-      );
+  }) => AppSettings(
+    reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+    reminderMode: reminderMode ?? this.reminderMode,
+    leadMinutes: leadMinutes ?? this.leadMinutes,
+    earlyClassCutoffMinutes:
+        earlyClassCutoffMinutes ?? this.earlyClassCutoffMinutes,
+    taskReminderEnabled: taskReminderEnabled ?? this.taskReminderEnabled,
+    defaultTaskReminderLeadMinutes:
+        defaultTaskReminderLeadMinutes ?? this.defaultTaskReminderLeadMinutes,
+    widgetOpacity: widgetOpacity ?? this.widgetOpacity,
+    widgetForm: widgetForm ?? this.widgetForm,
+    widgetAlwaysOnBottom: widgetAlwaysOnBottom ?? this.widgetAlwaysOnBottom,
+    autoStart: autoStart ?? this.autoStart,
+    theme: theme ?? this.theme,
+  );
 
   Map<String, dynamic> toJson() => {
-        'reminderEnabled': reminderEnabled,
-        'reminderMode': reminderMode.name,
-        'leadMinutes': leadMinutes,
-        'earlyClassCutoffMinutes': earlyClassCutoffMinutes,
-        'widgetOpacity': widgetOpacity,
-        'widgetForm': widgetForm.name,
-        'widgetAlwaysOnBottom': widgetAlwaysOnBottom,
-        'autoStart': autoStart,
-        'theme': theme.name,
-      };
+    'reminderEnabled': reminderEnabled,
+    'reminderMode': reminderMode.name,
+    'leadMinutes': leadMinutes,
+    'earlyClassCutoffMinutes': earlyClassCutoffMinutes,
+    'taskReminderEnabled': taskReminderEnabled,
+    'defaultTaskReminderLeadMinutes': defaultTaskReminderLeadMinutes,
+    'widgetOpacity': widgetOpacity,
+    'widgetForm': widgetForm.name,
+    'widgetAlwaysOnBottom': widgetAlwaysOnBottom,
+    'autoStart': autoStart,
+    'theme': theme.name,
+  };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
-        reminderEnabled: (json['reminderEnabled'] as bool?) ?? true,
-        reminderMode: _enumByName(
-            ReminderMode.values, json['reminderMode'], ReminderMode.firstClassOfDay),
-        leadMinutes: (json['leadMinutes'] as int?) ?? 30,
-        earlyClassCutoffMinutes:
-            (json['earlyClassCutoffMinutes'] as int?) ?? 9 * 60,
-        widgetOpacity: (json['widgetOpacity'] as num?)?.toDouble() ?? 0.95,
-        widgetForm:
-            _enumByName(WidgetForm.values, json['widgetForm'], WidgetForm.standard),
-        widgetAlwaysOnBottom: (json['widgetAlwaysOnBottom'] as bool?) ?? true,
-        autoStart: (json['autoStart'] as bool?) ?? false,
-        theme: _enumByName(ThemePref.values, json['theme'], ThemePref.system),
-      );
+    reminderEnabled: (json['reminderEnabled'] as bool?) ?? true,
+    reminderMode: _enumByName(
+      ReminderMode.values,
+      json['reminderMode'],
+      ReminderMode.firstClassOfDay,
+    ),
+    leadMinutes: (json['leadMinutes'] as int?) ?? 30,
+    earlyClassCutoffMinutes:
+        (json['earlyClassCutoffMinutes'] as int?) ?? 9 * 60,
+    taskReminderEnabled: (json['taskReminderEnabled'] as bool?) ?? true,
+    defaultTaskReminderLeadMinutes:
+        (json['defaultTaskReminderLeadMinutes'] as int?) ?? 24 * 60,
+    widgetOpacity: (json['widgetOpacity'] as num?)?.toDouble() ?? 0.95,
+    widgetForm: _enumByName(
+      WidgetForm.values,
+      json['widgetForm'],
+      WidgetForm.standard,
+    ),
+    widgetAlwaysOnBottom: (json['widgetAlwaysOnBottom'] as bool?) ?? true,
+    autoStart: (json['autoStart'] as bool?) ?? false,
+    theme: _enumByName(ThemePref.values, json['theme'], ThemePref.system),
+  );
 }
 
 T _enumByName<T extends Enum>(List<T> values, Object? name, T fallback) {

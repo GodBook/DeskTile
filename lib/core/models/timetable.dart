@@ -14,6 +14,7 @@ class Timetable {
     this.totalWeeks = 20,
     this.timeSlots = kDefaultTimeSlots,
     this.showWeekend = true,
+    this.archived = false,
     this.courses = const [],
     this.sessions = const [],
     this.scheduleChanges = const [],
@@ -27,6 +28,7 @@ class Timetable {
   final int totalWeeks;
   final List<TimeSlot> timeSlots;
   final bool showWeekend;
+  final bool archived;
   final List<Course> courses;
   final List<CourseSession> sessions;
   final List<ScheduleChange> scheduleChanges;
@@ -62,6 +64,7 @@ class Timetable {
     int? totalWeeks,
     List<TimeSlot>? timeSlots,
     bool? showWeekend,
+    bool? archived,
     List<Course>? courses,
     List<CourseSession>? sessions,
     List<ScheduleChange>? scheduleChanges,
@@ -72,6 +75,7 @@ class Timetable {
     totalWeeks: totalWeeks ?? this.totalWeeks,
     timeSlots: timeSlots ?? this.timeSlots,
     showWeekend: showWeekend ?? this.showWeekend,
+    archived: archived ?? this.archived,
     courses: courses ?? this.courses,
     sessions: sessions ?? this.sessions,
     scheduleChanges: scheduleChanges ?? this.scheduleChanges,
@@ -84,6 +88,7 @@ class Timetable {
     'totalWeeks': totalWeeks,
     'timeSlots': timeSlots.map((s) => s.toJson()).toList(),
     'showWeekend': showWeekend,
+    'archived': archived,
     'courses': courses.map((c) => c.toJson()).toList(),
     'sessions': sessions.map((s) => s.toJson()).toList(),
     'scheduleChanges': scheduleChanges.map((c) => c.toJson()).toList(),
@@ -100,6 +105,7 @@ class Timetable {
             .toList() ??
         kDefaultTimeSlots,
     showWeekend: (json['showWeekend'] as bool?) ?? true,
+    archived: (json['archived'] as bool?) ?? false,
     courses: (json['courses'] as List? ?? [])
         .map((e) => Course.fromJson(e as Map<String, dynamic>))
         .toList(),

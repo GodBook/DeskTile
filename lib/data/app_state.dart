@@ -27,6 +27,7 @@ class AppState extends ChangeNotifier {
   bool get loaded => _loaded;
   AppSettings get settings => _data.settings;
   Timetable? get activeTimetable => _data.activeTimetable;
+  List<Timetable> get timetables => _data.timetables;
   List<Exam> get exams => _data.exams;
   List<TaskItem> get tasks => _data.tasks;
 
@@ -71,8 +72,16 @@ class AppState extends ChangeNotifier {
     await store.save(_data);
   }
 
-  Future<void> setActiveTimetableId(String id) =>
-      _mutate((d) => d.copyWith(activeTimetableId: id));
+  Future<void> setActiveTimetableId(String id) => _mutate((d) {
+    if (!d.timetables.any((t) => t.id == id)) return d;
+    return d.copyWith(
+      timetables: [
+        for (final t in d.timetables)
+          if (t.id == id && t.archived) t.copyWith(archived: false) else t,
+      ],
+      activeTimetableId: id,
+    );
+  });
 
   /// 修改当前课表（改课程、改时段、改学期信息都走这里）。
   Future<void> updateActiveTimetable(Timetable Function(Timetable) change) =>
@@ -89,6 +98,19 @@ class AppState extends ChangeNotifier {
         );
       });
 
+  Future<void> updateTimetable(
+    String id,
+    Timetable Function(Timetable) change,
+  ) => _mutate((d) {
+    if (!d.timetables.any((t) => t.id == id)) return d;
+    return d.copyWith(
+      timetables: [
+        for (final t in d.timetables)
+          if (t.id == id) change(t) else t,
+      ],
+    );
+  });
+
   /// 导入：整表替换（同 id 覆盖，新 id 追加）并设为当前课表。
   Future<void> putTimetable(Timetable timetable) => _mutate((d) {
     final exists = d.timetables.any((t) => t.id == timetable.id);
@@ -104,19 +126,56 @@ class AppState extends ChangeNotifier {
   });
 
   Future<void> deleteTimetable(String id) => _mutate((d) {
+    final wasActive = d.activeTimetable?.id == id;
     final rest = d.timetables.where((t) => t.id != id).toList();
     if (rest.isEmpty) {
       final fresh = AppData.initial();
       return d.copyWith(
         timetables: fresh.timetables,
         activeTimetableId: fresh.activeTimetableId,
+        tasks: [
+          for (final task in d.tasks)
+            if (task.timetableId == id) task.withoutCourseLink() else task,
+        ],
       );
     }
+    final nextActive = rest.where((t) => !t.archived).firstOrNull ?? rest.first;
     return d.copyWith(
       timetables: rest,
-      activeTimetableId: d.activeTimetableId == id
-          ? rest.first.id
-          : d.activeTimetableId,
+      activeTimetableId: wasActive ? nextActive.id : d.activeTimetableId,
+      tasks: [
+        for (final task in d.tasks)
+          if (task.timetableId == id) task.withoutCourseLink() else task,
+      ],
+    );
+  });
+
+  Future<void> setTimetableArchived(String id, bool archived) => _mutate((d) {
+    final target = d.timetables.where((t) => t.id == id).firstOrNull;
+    if (target == null || target.archived == archived) return d;
+    final updated = [
+      for (final t in d.timetables)
+        if (t.id == id) t.copyWith(archived: archived) else t,
+    ];
+    if (!archived || d.activeTimetable?.id != id) {
+      return d.copyWith(timetables: updated);
+    }
+    final next = updated.where((t) => !t.archived).firstOrNull;
+    if (next != null) {
+      return d.copyWith(timetables: updated, activeTimetableId: next.id);
+    }
+    final template = AppData.initial().activeTimetable!;
+    final fresh = Timetable(
+      id: newId('timetable'),
+      name: template.name,
+      termStart: template.termStart,
+      totalWeeks: template.totalWeeks,
+      timeSlots: template.timeSlots,
+      showWeekend: template.showWeekend,
+    );
+    return d.copyWith(
+      timetables: [...updated, fresh],
+      activeTimetableId: fresh.id,
     );
   });
 
@@ -160,6 +219,44 @@ class AppState extends ChangeNotifier {
           ],
         ),
       );
+
+  Future<void> snoozeTask(
+    String id, {
+    Duration delay = const Duration(minutes: 10),
+    DateTime? now,
+  }) => _mutate(
+    (data) => data.copyWith(
+      tasks: [
+        for (final task in data.tasks)
+          if (task.id == id && !task.isCompleted)
+            task.withReminderAt((now ?? DateTime.now()).add(delay))
+          else
+            task,
+      ],
+    ),
+  );
+
+  /// 通知操作可能落到只读挂件进程。先读取磁盘最新状态，只修改目标待办，
+  /// 避免用挂件内存里的旧课表覆盖主窗口刚保存的数据。
+  Future<void> snoozeTaskSafely(
+    String id, {
+    Duration delay = const Duration(minutes: 10),
+    DateTime? now,
+  }) async {
+    final fresh = await store.load();
+    final instant = now ?? DateTime.now();
+    _data = fresh.copyWith(
+      tasks: [
+        for (final task in fresh.tasks)
+          if (task.id == id && !task.isCompleted)
+            task.withReminderAt(instant.add(delay))
+          else
+            task,
+      ],
+    );
+    notifyListeners();
+    await store.save(_data);
+  }
 
   Future<void> deleteTask(String id) => _mutate(
     (data) => data.copyWith(

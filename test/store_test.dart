@@ -35,6 +35,7 @@ void main() {
 
   test('存取往返：课表、考试、作业待办、设置都不丢', () async {
     final timetable = buildTestTimetable().copyWith(
+      archived: true,
       scheduleChanges: [
         ScheduleChange.reschedule(
           id: 'change1',
@@ -62,6 +63,8 @@ void main() {
       settings: const AppSettings(
         reminderMode: ReminderMode.everyClass,
         leadMinutes: 15,
+        taskReminderEnabled: false,
+        defaultTaskReminderLeadMinutes: 120,
         widgetOpacity: 0.8,
         widgetForm: WidgetForm.mini,
         autoStart: true,
@@ -74,6 +77,7 @@ void main() {
           kind: TaskKind.homework,
           createdAt: DateTime(2026, 9, 7, 12),
           dueAt: DateTime(2026, 9, 8, 23, 59),
+          reminderAt: DateTime(2026, 9, 8, 21, 59),
           timetableId: 't1',
           courseId: 'c1',
           priority: TaskPriority.important,
@@ -88,6 +92,7 @@ void main() {
     expect(loaded.timetables.single.courses.length, 4);
     expect(loaded.timetables.single.sessions.length, 4);
     expect(loaded.timetables.single.termStart, testTermStart);
+    expect(loaded.timetables.single.archived, isTrue);
 
     final linear = loaded.timetables.single.sessions.firstWhere(
       (s) => s.id == 's3',
@@ -105,8 +110,11 @@ void main() {
     expect(loaded.tasks.single.kind, TaskKind.homework);
     expect(loaded.tasks.single.courseId, 'c1');
     expect(loaded.tasks.single.priority, TaskPriority.important);
+    expect(loaded.tasks.single.reminderAt, DateTime(2026, 9, 8, 21, 59));
     expect(loaded.settings.reminderMode, ReminderMode.everyClass);
     expect(loaded.settings.leadMinutes, 15);
+    expect(loaded.settings.taskReminderEnabled, isFalse);
+    expect(loaded.settings.defaultTaskReminderLeadMinutes, 120);
     expect(loaded.settings.widgetForm, WidgetForm.mini);
     expect(loaded.settings.autoStart, isTrue);
     expect(loaded.settings.theme, ThemePref.dark);
@@ -144,7 +152,7 @@ void main() {
     final file = await store.dataFile();
     final json = jsonDecode(utf8.decode(file.readAsBytesSync()));
     expect(json['schemaVersion'], AppData.schemaVersion);
-    expect(json['schemaVersion'], 3);
+    expect(json['schemaVersion'], 4);
   });
 
   test('旧数据没有 tasks 字段时按空列表读取', () {
@@ -156,6 +164,42 @@ void main() {
     final json = buildTestTimetable().toJson()..remove('scheduleChanges');
     final timetable = Timetable.fromJson(json);
     expect(timetable.scheduleChanges, isEmpty);
+  });
+
+  test('旧数据缺少归档和待办提醒字段时使用默认值', () {
+    final timetableJson = buildTestTimetable().toJson()..remove('archived');
+    final taskJson = TaskItem(
+      id: 'task1',
+      title: '旧待办',
+      kind: TaskKind.todo,
+      createdAt: DateTime(2026, 9, 1),
+    ).toJson()..remove('reminderAt');
+    final settingsJson = const AppSettings().toJson()
+      ..remove('taskReminderEnabled')
+      ..remove('defaultTaskReminderLeadMinutes');
+
+    expect(Timetable.fromJson(timetableJson).archived, isFalse);
+    expect(TaskItem.fromJson(taskJson).reminderAt, isNull);
+    final settings = AppSettings.fromJson(settingsJson);
+    expect(settings.taskReminderEnabled, isTrue);
+    expect(settings.defaultTaskReminderLeadMinutes, 24 * 60);
+  });
+
+  test('活动课表 id 指向已归档课表时优先使用未归档课表', () {
+    final archived = buildTestTimetable().copyWith(archived: true);
+    final current = Timetable(
+      id: 't2',
+      name: '新学期',
+      termStart: archived.termStart,
+    );
+    final data = AppData(
+      timetables: [archived, current],
+      exams: const [],
+      settings: const AppSettings(),
+      activeTimetableId: archived.id,
+    );
+
+    expect(data.activeTimetable?.id, 't2');
   });
 
   test('newId 不重复', () {

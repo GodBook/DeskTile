@@ -6,16 +6,21 @@ import '../../core/models/timetable.dart';
 import '../../core/task_query.dart';
 import '../../data/app_state.dart';
 import '../../data/store.dart';
+import '../../platform/notifications.dart';
 import '../theme.dart';
 
 enum _TaskFilter { pending, completed, all }
 
-enum _TaskMenuAction { edit, delete }
+enum _TaskMenuAction { snooze, edit, delete }
+
+enum _TaskReminderChoice { none, dayBefore, twoHoursBefore, custom }
 
 typedef _TaskCourse = ({Course course, Timetable timetable});
 
 class TasksPage extends StatefulWidget {
-  const TasksPage({super.key});
+  const TasksPage({super.key, this.reminders});
+
+  final ReminderService? reminders;
 
   @override
   State<TasksPage> createState() => _TasksPageState();
@@ -54,7 +59,8 @@ class _TasksPageState extends State<TasksPage> {
                 ),
               ),
               FilledButton.icon(
-                onPressed: () => showTaskEditor(context),
+                onPressed: () =>
+                    showTaskEditor(context, reminders: widget.reminders),
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('添加事项'),
               ),
@@ -95,9 +101,14 @@ class _TasksPageState extends State<TasksPage> {
           child: visible.isEmpty
               ? _TaskEmptyState(
                   filter: _filter,
-                  onAdd: () => showTaskEditor(context),
+                  onAdd: () =>
+                      showTaskEditor(context, reminders: widget.reminders),
                 )
-              : _TaskList(tasks: visible, now: now),
+              : _TaskList(
+                  tasks: visible,
+                  now: now,
+                  reminders: widget.reminders,
+                ),
         ),
       ],
     );
@@ -197,10 +208,15 @@ class _TaskEmptyState extends StatelessWidget {
 }
 
 class _TaskList extends StatelessWidget {
-  const _TaskList({required this.tasks, required this.now});
+  const _TaskList({
+    required this.tasks,
+    required this.now,
+    required this.reminders,
+  });
 
   final List<TaskItem> tasks;
   final DateTime now;
+  final ReminderService? reminders;
 
   @override
   Widget build(BuildContext context) {
@@ -216,7 +232,7 @@ class _TaskList extends StatelessWidget {
           if (grouped[group] case final items?) ...[
             _TaskGroupHeader(group: group, count: items.length),
             for (final task in items) ...[
-              _TaskRow(task: task, now: now),
+              _TaskRow(task: task, now: now, reminders: reminders),
               const Divider(height: 1),
             ],
           ],
@@ -257,10 +273,15 @@ class _TaskGroupHeader extends StatelessWidget {
 }
 
 class _TaskRow extends StatelessWidget {
-  const _TaskRow({required this.task, required this.now});
+  const _TaskRow({
+    required this.task,
+    required this.now,
+    required this.reminders,
+  });
 
   final TaskItem task;
   final DateTime now;
+  final ReminderService? reminders;
 
   @override
   Widget build(BuildContext context) {
@@ -281,7 +302,7 @@ class _TaskRow extends StatelessWidget {
       key: ValueKey('task-row-${task.id}'),
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => showTaskEditor(context, task: task),
+        onTap: () => showTaskEditor(context, task: task, reminders: reminders),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(
@@ -354,6 +375,11 @@ class _TaskRow extends StatelessWidget {
                               label: _dueText(task.dueAt!, now),
                               color: dueColor,
                             ),
+                          if (!task.isCompleted && task.reminderAt != null)
+                            _TaskMeta(
+                              icon: Icons.notifications_active_outlined,
+                              label: _reminderText(task.reminderAt!, now),
+                            ),
                         ],
                       ),
                       if (task.note?.isNotEmpty ?? false) ...[
@@ -374,16 +400,37 @@ class _TaskRow extends StatelessWidget {
               PopupMenuButton<_TaskMenuAction>(
                 tooltip: '更多操作',
                 icon: const Icon(Icons.more_horiz),
-                onSelected: (action) {
+                onSelected: (action) async {
                   switch (action) {
+                    case _TaskMenuAction.snooze:
+                      final state = AppScope.read(context);
+                      await state.snoozeTask(task.id);
+                      await reminders?.requestAndroidPermissions();
+                      await reminders?.reschedule(
+                        timetable: state.activeTimetable,
+                        timetables: state.timetables,
+                        tasks: state.tasks,
+                        settings: state.settings,
+                      );
                     case _TaskMenuAction.edit:
-                      showTaskEditor(context, task: task);
+                      showTaskEditor(context, task: task, reminders: reminders);
                     case _TaskMenuAction.delete:
                       AppScope.read(context).deleteTask(task.id);
                   }
                 },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
+                itemBuilder: (context) => [
+                  if (!task.isCompleted)
+                    const PopupMenuItem(
+                      value: _TaskMenuAction.snooze,
+                      child: Row(
+                        children: [
+                          Icon(Icons.snooze, size: 18),
+                          SizedBox(width: 10),
+                          Text('10 分钟后提醒'),
+                        ],
+                      ),
+                    ),
+                  const PopupMenuItem(
                     value: _TaskMenuAction.edit,
                     child: Row(
                       children: [
@@ -438,7 +485,11 @@ class _TaskMeta extends StatelessWidget {
   }
 }
 
-Future<void> showTaskEditor(BuildContext context, {TaskItem? task}) async {
+Future<void> showTaskEditor(
+  BuildContext context, {
+  TaskItem? task,
+  ReminderService? reminders,
+}) async {
   final state = AppScope.read(context);
   Timetable? timetable;
   final targetTimetableId = task?.timetableId ?? state.activeTimetable?.id;
@@ -451,15 +502,30 @@ Future<void> showTaskEditor(BuildContext context, {TaskItem? task}) async {
   timetable ??= state.activeTimetable;
   await showDialog<void>(
     context: context,
-    builder: (context) => _TaskEditorDialog(task: task, timetable: timetable),
+    builder: (context) => _TaskEditorDialog(
+      task: task,
+      timetable: timetable,
+      reminders: reminders,
+      taskReminderEnabled: state.settings.taskReminderEnabled,
+      defaultReminderLeadMinutes: state.settings.defaultTaskReminderLeadMinutes,
+    ),
   );
 }
 
 class _TaskEditorDialog extends StatefulWidget {
-  const _TaskEditorDialog({required this.task, required this.timetable});
+  const _TaskEditorDialog({
+    required this.task,
+    required this.timetable,
+    required this.reminders,
+    required this.taskReminderEnabled,
+    required this.defaultReminderLeadMinutes,
+  });
 
   final TaskItem? task;
   final Timetable? timetable;
+  final ReminderService? reminders;
+  final bool taskReminderEnabled;
+  final int defaultReminderLeadMinutes;
 
   @override
   State<_TaskEditorDialog> createState() => _TaskEditorDialogState();
@@ -472,9 +538,13 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
   late bool _hasDeadline;
   late DateTime _dueDate;
   late TimeOfDay _dueTime;
+  late _TaskReminderChoice _reminderChoice;
+  late DateTime _reminderDate;
+  late TimeOfDay _reminderTime;
   late final TextEditingController _title;
   late final TextEditingController _note;
   String? _titleError;
+  String? _reminderError;
 
   @override
   void initState() {
@@ -494,6 +564,30 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
     _hasDeadline = task?.dueAt != null || task == null;
     _dueDate = DateTime(dueAt.year, dueAt.month, dueAt.day);
     _dueTime = TimeOfDay(hour: dueAt.hour, minute: dueAt.minute);
+    final reminderAt = task?.reminderAt;
+    final leadMinutes = reminderAt == null
+        ? null
+        : dueAt.difference(reminderAt).inMinutes;
+    _reminderChoice = reminderAt == null
+        ? task == null && widget.taskReminderEnabled
+              ? _choiceForLead(widget.defaultReminderLeadMinutes)
+              : _TaskReminderChoice.none
+        : leadMinutes == 24 * 60
+        ? _TaskReminderChoice.dayBefore
+        : leadMinutes == 2 * 60
+        ? _TaskReminderChoice.twoHoursBefore
+        : _TaskReminderChoice.custom;
+    final fallbackReminder = dueAt.subtract(const Duration(hours: 1));
+    final initialReminder = reminderAt ?? fallbackReminder;
+    _reminderDate = DateTime(
+      initialReminder.year,
+      initialReminder.month,
+      initialReminder.day,
+    );
+    _reminderTime = TimeOfDay(
+      hour: initialReminder.hour,
+      minute: initialReminder.minute,
+    );
     _title = TextEditingController(text: task?.title ?? '');
     _note = TextEditingController(text: task?.note ?? '');
   }
@@ -513,6 +607,25 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
     _dueTime.minute,
   );
 
+  DateTime get _combinedReminder => DateTime(
+    _reminderDate.year,
+    _reminderDate.month,
+    _reminderDate.day,
+    _reminderTime.hour,
+    _reminderTime.minute,
+  );
+
+  DateTime? get _resolvedReminder => switch (_reminderChoice) {
+    _TaskReminderChoice.none => null,
+    _TaskReminderChoice.dayBefore => _combinedDue.subtract(
+      const Duration(days: 1),
+    ),
+    _TaskReminderChoice.twoHoursBefore => _combinedDue.subtract(
+      const Duration(hours: 2),
+    ),
+    _TaskReminderChoice.custom => _combinedReminder,
+  };
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -531,6 +644,34 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
     if (picked != null) setState(() => _dueTime = picked);
   }
 
+  Future<void> _pickReminderDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _reminderDate,
+      firstDate: DateTime(_reminderDate.year - 2),
+      lastDate: DateTime(_reminderDate.year + 10),
+    );
+    if (picked != null) {
+      setState(() {
+        _reminderDate = picked;
+        _reminderError = null;
+      });
+    }
+  }
+
+  Future<void> _pickReminderTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _reminderTime,
+    );
+    if (picked != null) {
+      setState(() {
+        _reminderTime = picked;
+        _reminderError = null;
+      });
+    }
+  }
+
   Future<void> _save() async {
     final title = _title.text.trim();
     if (title.isEmpty) {
@@ -538,20 +679,43 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
       return;
     }
     final courseId = _courseId.isEmpty ? null : _courseId;
+    final reminderAt = _hasDeadline ? _resolvedReminder : null;
+    final now = DateTime.now();
     final existing = widget.task;
+    if (existing?.isCompleted != true &&
+        reminderAt != null &&
+        !reminderAt.isAfter(now)) {
+      setState(() => _reminderError = '提醒时间已经过去');
+      return;
+    }
+    if (reminderAt != null && reminderAt.isAfter(_combinedDue)) {
+      setState(() => _reminderError = '提醒时间不能晚于截止时间');
+      return;
+    }
     final task = TaskItem(
       id: existing?.id ?? newId('task'),
       title: title,
       kind: _kind,
       createdAt: existing?.createdAt ?? DateTime.now(),
       dueAt: _hasDeadline ? _combinedDue : null,
+      reminderAt: reminderAt,
       timetableId: courseId == null ? null : widget.timetable?.id,
       courseId: courseId,
       note: _note.text.trim().isEmpty ? null : _note.text.trim(),
       priority: _priority,
       completedAt: existing?.completedAt,
     );
-    await AppScope.read(context).putTask(task);
+    final state = AppScope.read(context);
+    await state.putTask(task);
+    if (reminderAt != null) {
+      await widget.reminders?.requestAndroidPermissions();
+    }
+    await widget.reminders?.reschedule(
+      timetable: state.activeTimetable,
+      timetables: state.timetables,
+      tasks: state.tasks,
+      settings: state.settings,
+    );
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -641,7 +805,18 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('设置截止时间'),
                 value: _hasDeadline,
-                onChanged: (value) => setState(() => _hasDeadline = value),
+                onChanged: (value) => setState(() {
+                  _hasDeadline = value;
+                  _reminderError = null;
+                  if (!value) {
+                    _reminderChoice = _TaskReminderChoice.none;
+                  } else if (_reminderChoice == _TaskReminderChoice.none &&
+                      widget.taskReminderEnabled) {
+                    _reminderChoice = _choiceForLead(
+                      widget.defaultReminderLeadMinutes,
+                    );
+                  }
+                }),
               ),
               if (_hasDeadline) ...[
                 const SizedBox(height: 4),
@@ -678,6 +853,77 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
                     );
                   },
                 ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<_TaskReminderChoice>(
+                  key: const ValueKey('task-reminder-choice'),
+                  initialValue: _reminderChoice,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: '截止提醒',
+                    errorText: _reminderError,
+                    helperText: widget.taskReminderEnabled
+                        ? '通知中可选择 10 分钟后再次提醒'
+                        : '设置中已关闭待办提醒，开启后才会生效',
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: _TaskReminderChoice.none,
+                      child: Text('不提醒'),
+                    ),
+                    DropdownMenuItem(
+                      value: _TaskReminderChoice.dayBefore,
+                      child: Text('提前一天'),
+                    ),
+                    DropdownMenuItem(
+                      value: _TaskReminderChoice.twoHoursBefore,
+                      child: Text('提前两小时'),
+                    ),
+                    DropdownMenuItem(
+                      value: _TaskReminderChoice.custom,
+                      child: Text('自定义时间'),
+                    ),
+                  ],
+                  onChanged: (value) => setState(() {
+                    _reminderChoice = value ?? _TaskReminderChoice.none;
+                    _reminderError = null;
+                  }),
+                ),
+                if (_reminderChoice == _TaskReminderChoice.custom) ...[
+                  const SizedBox(height: 10),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final dateButton = OutlinedButton.icon(
+                        key: const ValueKey('task-reminder-date'),
+                        onPressed: _pickReminderDate,
+                        icon: const Icon(Icons.event_outlined, size: 18),
+                        label: Text(monthDayText(_reminderDate)),
+                      );
+                      final timeButton = OutlinedButton.icon(
+                        key: const ValueKey('task-reminder-time'),
+                        onPressed: _pickReminderTime,
+                        icon: const Icon(Icons.alarm_outlined, size: 18),
+                        label: Text(_timeText(_reminderTime)),
+                      );
+                      if (constraints.maxWidth < 320) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            dateButton,
+                            const SizedBox(height: 10),
+                            timeButton,
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: dateButton),
+                          const SizedBox(width: 12),
+                          Expanded(child: timeButton),
+                        ],
+                      );
+                    },
+                  ),
+                ],
               ],
               const SizedBox(height: 12),
               TextField(
@@ -745,3 +991,10 @@ String _dueText(DateTime dueAt, DateTime now) {
 String _timeText(TimeOfDay time) =>
     '${time.hour.toString().padLeft(2, '0')}:'
     '${time.minute.toString().padLeft(2, '0')}';
+
+_TaskReminderChoice _choiceForLead(int minutes) => minutes == 2 * 60
+    ? _TaskReminderChoice.twoHoursBefore
+    : _TaskReminderChoice.dayBefore;
+
+String _reminderText(DateTime reminderAt, DateTime now) =>
+    reminderAt.isBefore(now) ? '提醒时间已过' : '提醒 ${_dueText(reminderAt, now)}';

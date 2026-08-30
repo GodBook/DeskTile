@@ -4,9 +4,11 @@ import '../data/app_state.dart';
 import '../platform/notifications.dart';
 import 'pages/exams_page.dart';
 import 'pages/import_export_page.dart';
+import 'pages/more_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/tasks_page.dart';
 import 'pages/timetable_page.dart';
+import 'pages/today_page.dart';
 import 'theme.dart';
 
 /// 主窗口：编辑课表、管理考试、导入导出、设置。
@@ -47,38 +49,52 @@ class _Shell extends StatefulWidget {
 class _ShellState extends State<_Shell> {
   static const _compactBreakpoint = 640.0;
 
-  int _index = 0;
+  _MainSection _section = _MainSection.today;
+
+  Widget _page(_MainSection section) => switch (section) {
+    _MainSection.today => TodayPage(reminders: widget.reminders),
+    _MainSection.timetable => const TimetablePage(),
+    _MainSection.tasks => TasksPage(reminders: widget.reminders),
+    _MainSection.exams => const ExamsPage(),
+    _MainSection.importExport => const ImportExportPage(),
+    _MainSection.settings => SettingsPage(reminders: widget.reminders),
+    _MainSection.more => MorePage(reminders: widget.reminders),
+  };
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      const TimetablePage(),
-      const TasksPage(),
-      const ExamsPage(),
-      const ImportExportPage(),
-      SettingsPage(reminders: widget.reminders),
-    ];
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < _compactBreakpoint;
+        final sections = compact ? _compactSections : _wideSections;
+        final displaySection = sections.contains(_section)
+            ? _section
+            : compact
+            ? _MainSection.more
+            : _MainSection.settings;
+        final selectedIndex = sections.indexOf(displaySection);
         return Scaffold(
           body: SafeArea(
             bottom: false,
             child: compact
-                ? pages[_index]
+                ? _page(displaySection)
                 : Row(
                     children: [
                       NavigationRail(
-                        selectedIndex: _index,
+                        selectedIndex: selectedIndex,
                         onDestinationSelected: (i) =>
-                            setState(() => _index = i),
+                            setState(() => _section = sections[i]),
                         labelType: NavigationRailLabelType.all,
                         leading: const Padding(
                           padding: EdgeInsets.only(top: 12, bottom: 4),
                           child: Icon(Icons.grid_view_rounded, size: 26),
                         ),
                         destinations: const [
+                          NavigationRailDestination(
+                            icon: Icon(Icons.today_outlined),
+                            selectedIcon: Icon(Icons.today),
+                            label: Text('今天'),
+                          ),
                           NavigationRailDestination(
                             icon: Icon(Icons.calendar_view_week_outlined),
                             selectedIcon: Icon(Icons.calendar_view_week),
@@ -107,15 +123,21 @@ class _ShellState extends State<_Shell> {
                         ],
                       ),
                       const VerticalDivider(width: 1),
-                      Expanded(child: pages[_index]),
+                      Expanded(child: _page(displaySection)),
                     ],
                   ),
           ),
           bottomNavigationBar: compact
               ? NavigationBar(
-                  selectedIndex: _index,
-                  onDestinationSelected: (i) => setState(() => _index = i),
+                  selectedIndex: selectedIndex,
+                  onDestinationSelected: (i) =>
+                      setState(() => _section = sections[i]),
                   destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.today_outlined),
+                      selectedIcon: Icon(Icons.today),
+                      label: '今天',
+                    ),
                     NavigationDestination(
                       icon: Icon(Icons.calendar_view_week_outlined),
                       selectedIcon: Icon(Icons.calendar_view_week),
@@ -132,14 +154,9 @@ class _ShellState extends State<_Shell> {
                       label: '考试',
                     ),
                     NavigationDestination(
-                      icon: Icon(Icons.import_export_outlined),
-                      selectedIcon: Icon(Icons.import_export),
-                      label: '导入导出',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.settings_outlined),
-                      selectedIcon: Icon(Icons.settings),
-                      label: '设置',
+                      icon: Icon(Icons.more_horiz),
+                      selectedIcon: Icon(Icons.more),
+                      label: '更多',
                     ),
                   ],
                 )
@@ -149,3 +166,30 @@ class _ShellState extends State<_Shell> {
     );
   }
 }
+
+enum _MainSection {
+  today,
+  timetable,
+  tasks,
+  exams,
+  importExport,
+  settings,
+  more,
+}
+
+const _wideSections = [
+  _MainSection.today,
+  _MainSection.timetable,
+  _MainSection.tasks,
+  _MainSection.exams,
+  _MainSection.importExport,
+  _MainSection.settings,
+];
+
+const _compactSections = [
+  _MainSection.today,
+  _MainSection.timetable,
+  _MainSection.tasks,
+  _MainSection.exams,
+  _MainSection.more,
+];

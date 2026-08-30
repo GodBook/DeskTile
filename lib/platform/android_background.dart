@@ -34,6 +34,8 @@ void androidBackgroundDispatcher() {
           if (!await reminders.init()) return false;
           await reminders.reschedule(
             timetable: data.activeTimetable,
+            timetables: data.timetables,
+            tasks: data.tasks,
             settings: data.settings,
           );
           return true;

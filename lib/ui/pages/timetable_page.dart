@@ -11,6 +11,7 @@ import '../../data/app_state.dart';
 import '../theme.dart';
 import 'schedule_change_editor.dart';
 import 'session_editor.dart';
+import 'timetable_manager.dart';
 
 const _rowHeight = 58.0;
 const _timeColumnWidth = 52.0;
@@ -29,6 +30,7 @@ class TimetablePage extends StatefulWidget {
 
 class _TimetablePageState extends State<TimetablePage> {
   int? _week;
+  String? _timetableId;
 
   int weekOf(Timetable t) =>
       _week ?? clampedWeek(t.termStart, DateTime.now(), t.totalWeeks);
@@ -39,6 +41,10 @@ class _TimetablePageState extends State<TimetablePage> {
     final t = state.activeTimetable;
     if (t == null) {
       return const Center(child: Text('还没有课表'));
+    }
+    if (_timetableId != t.id) {
+      _timetableId = t.id;
+      _week = null;
     }
     final week = weekOf(t).clamp(1, t.totalWeeks);
 
@@ -111,11 +117,28 @@ class _Toolbar extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        timetable.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium,
+                      child: Tooltip(
+                        message: '管理课表',
+                        child: InkWell(
+                          key: const ValueKey('timetable-manager'),
+                          onTap: () => showTimetableManager(context),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    timetable.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.titleMedium,
+                                  ),
+                                ),
+                                const Icon(Icons.expand_more, size: 18),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -169,7 +192,18 @@ class _Toolbar extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
           child: Row(
             children: [
-              Text(timetable.name, style: theme.textTheme.titleMedium),
+              TextButton.icon(
+                key: const ValueKey('timetable-manager'),
+                onPressed: () => showTimetableManager(context),
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(Icons.expand_more, size: 18),
+                label: Text(
+                  timetable.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
               const SizedBox(width: 16),
               IconButton(
                 tooltip: '上一周',

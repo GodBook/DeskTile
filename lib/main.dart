@@ -42,7 +42,10 @@ Future<void> _runAndroidMain(DataStore store) async {
   final state = AppState(store: store);
   await state.load();
 
-  final reminders = ReminderService();
+  late final ReminderService reminders;
+  reminders = ReminderService(
+    onTaskSnooze: (taskId) => state.snoozeTask(taskId),
+  );
   runApp(MainApp(state: state, reminders: reminders));
 
   var syncing = false;
@@ -51,6 +54,8 @@ Future<void> _runAndroidMain(DataStore store) async {
   var debouncedReminderSync = false;
   Timer? debounce;
   var lastTimetable = state.activeTimetable;
+  var lastTasks = state.tasks;
+  var lastSettings = state.settings;
 
   Future<void> sync({bool remindersToo = false}) async {
     reminderSyncPending = reminderSyncPending || remindersToo;
@@ -70,6 +75,8 @@ Future<void> _runAndroidMain(DataStore store) async {
       if (shouldSyncReminders) {
         await reminders.reschedule(
           timetable: state.activeTimetable,
+          timetables: state.timetables,
+          tasks: state.tasks,
           settings: state.settings,
         );
       }
@@ -79,17 +86,22 @@ Future<void> _runAndroidMain(DataStore store) async {
 
   void scheduleSync() {
     final timetableChanged = !identical(lastTimetable, state.activeTimetable);
+    final tasksChanged = !identical(lastTasks, state.tasks);
+    final settingsChanged = !identical(lastSettings, state.settings);
     lastTimetable = state.activeTimetable;
-    debouncedReminderSync = debouncedReminderSync || timetableChanged;
+    lastTasks = state.tasks;
+    lastSettings = state.settings;
+    debouncedReminderSync =
+        debouncedReminderSync ||
+        timetableChanged ||
+        tasksChanged ||
+        settingsChanged;
     debounce?.cancel();
-    debounce = Timer(
-      const Duration(milliseconds: 300),
-      () {
-        final shouldSyncReminders = debouncedReminderSync;
-        debouncedReminderSync = false;
-        unawaited(sync(remindersToo: shouldSyncReminders));
-      },
-    );
+    debounce = Timer(const Duration(milliseconds: 300), () {
+      final shouldSyncReminders = debouncedReminderSync;
+      debouncedReminderSync = false;
+      unawaited(sync(remindersToo: shouldSyncReminders));
+    });
   }
 
   state.addListener(scheduleSync);
@@ -116,14 +128,36 @@ Future<void> _runMainWindow(DataStore store) async {
   await state.load();
   await setupMainWindow();
 
-  final reminders = ReminderService();
+  late final ReminderService reminders;
+  reminders = ReminderService(
+    onTaskSnooze: (taskId) => state.snoozeTask(taskId),
+  );
   await reminders.init();
   final scheduled = await reminders.reschedule(
     timetable: state.activeTimetable,
+    timetables: state.timetables,
+    tasks: state.tasks,
     settings: state.settings,
   );
-  debugPrint('[DeskTile] 主窗口启动，提醒已排定 $scheduled 条'
-      '${reminders.lastError == null ? '' : '，最近一次错误：${reminders.lastError}'}');
+  debugPrint(
+    '[DeskTile] 主窗口启动，提醒已排定 $scheduled 条'
+    '${reminders.lastError == null ? '' : '，最近一次错误：${reminders.lastError}'}',
+  );
+
+  Timer? reminderDebounce;
+  state.addListener(() {
+    reminderDebounce?.cancel();
+    reminderDebounce = Timer(const Duration(milliseconds: 300), () {
+      unawaited(
+        reminders.reschedule(
+          timetable: state.activeTimetable,
+          timetables: state.timetables,
+          tasks: state.tasks,
+          settings: state.settings,
+        ),
+      );
+    });
+  });
 
   runApp(MainApp(state: state, reminders: reminders));
 }
@@ -142,17 +176,24 @@ Future<void> _runWidget(DataStore store) async {
   await setupWidgetWindow(state.settings, await positionStore.load());
   state.startWatching();
 
-  final reminders = ReminderService();
+  late final ReminderService reminders;
+  reminders = ReminderService(
+    onTaskSnooze: (taskId) => state.snoozeTaskSafely(taskId),
+  );
   await reminders.init();
 
   Future<void> reschedule() async {
     final n = await reminders.reschedule(
       timetable: state.activeTimetable,
+      timetables: state.timetables,
+      tasks: state.tasks,
       settings: state.settings,
     );
     final pending = await reminders.pendingCount();
-    debugPrint('[DeskTile] 挂件重排提醒 $n 条，系统里待触发 $pending 条'
-        '${reminders.lastError == null ? '' : '，最近一次错误：${reminders.lastError}'}');
+    debugPrint(
+      '[DeskTile] 挂件重排提醒 $n 条，系统里待触发 $pending 条'
+      '${reminders.lastError == null ? '' : '，最近一次错误：${reminders.lastError}'}',
+    );
   }
 
   await reschedule();
