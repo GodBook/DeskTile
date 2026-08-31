@@ -209,6 +209,14 @@ void main() {
     expect(find.byKey(const ValueKey('today-list')), findsOneWidget);
     expect(find.text('今天的课'), findsWidgets);
     expect(find.text('今天提交实验报告'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('近期测试'),
+      180,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('today-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
     expect(find.text('近期测试'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -343,6 +351,74 @@ void main() {
     expect(find.text('添加课程'), findsOneWidget);
     expect(find.text('高等数学'), findsOneWidget);
     expect(find.text('教三-305'), findsOneWidget);
+  });
+
+  testWidgets('课表冲突：提示学期冲突、展示详情并定位到对应周', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 700);
+    addTearDown(tester.view.reset);
+
+    final base = buildTestTimetable(termStart: mondayOf(DateTime.now()));
+    final conflictDate = base.termStart.add(const Duration(days: 14));
+    final timetable = base.copyWith(
+      courses: [
+        ...base.courses,
+        const Course(id: 'conflict-course', name: '冲突课程'),
+      ],
+      sessions: [
+        ...base.sessions,
+        const CourseSession(
+          id: 'conflict-session',
+          courseId: 'conflict-course',
+          day: 1,
+          startSection: 1,
+          endSection: 2,
+          weeks: {3},
+          room: '测试教室',
+        ),
+      ],
+    );
+    final state = await _makeState(
+      tester,
+      timetables: [timetable],
+      activeTimetableId: timetable.id,
+    );
+    await tester.pumpWidget(_host(state, const TimetablePage()));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('schedule-conflict-banner')),
+      findsOneWidget,
+    );
+    expect(find.text('本学期有 1 处课程时间冲突'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const ValueKey('schedule-conflict-banner')));
+    await tester.pumpAndSettle();
+    expect(find.text('课表冲突'), findsOneWidget);
+    expect(find.text('共 1 处实际课程时间重叠'), findsOneWidget);
+    expect(find.textContaining('冲突课程'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(
+        ValueKey('schedule-conflict-${conflictDate.millisecondsSinceEpoch}'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('第 3 周 · 单周'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('课程编辑器：保存前实时提示重复课程冲突次数', (tester) async {
+    final state = await _makeState(tester);
+    await tester.pumpWidget(_host(state, const TimetablePage()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('添加课程'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('该安排会在 16 天与 高等数学 时间重叠'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Android 周视图支持双指缩放网格', (tester) async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/course.dart';
 import '../../core/models/timetable.dart';
+import '../../core/schedule_conflict.dart';
 import '../../core/week_math.dart';
 import '../../core/weeks_parser.dart';
 import '../../data/app_state.dart';
@@ -60,6 +61,8 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
   late final TextEditingController _teacher;
   late final TextEditingController _room;
   late final TextEditingController _weeksText;
+  late final String _sessionId;
+  late final String _previewCourseId;
 
   late int _day;
   late int _start;
@@ -75,6 +78,8 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
     super.initState();
     final s = widget.session;
     final course = s == null ? null : t.courseById(s.courseId);
+    _sessionId = s?.id ?? newId('s');
+    _previewCourseId = s?.courseId ?? newId('c');
     _name = TextEditingController(text: course?.name ?? '');
     _teacher = TextEditingController(text: course?.teacher ?? '');
     _room = TextEditingController(text: s?.room ?? '');
@@ -120,6 +125,39 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
     });
   }
 
+  Timetable get _previewTimetable {
+    final course = Course(
+      id: _previewCourseId,
+      name: _name.text.trim().isEmpty ? '当前课程' : _name.text.trim(),
+      teacher: _teacher.text.trim().isEmpty ? null : _teacher.text.trim(),
+    );
+    final courses = [
+      for (final existing in t.courses)
+        if (existing.id == course.id) course else existing,
+      if (!t.courses.any((existing) => existing.id == course.id)) course,
+    ];
+    final session = CourseSession(
+      id: _sessionId,
+      courseId: course.id,
+      day: _day,
+      startSection: _start,
+      endSection: _end < _start ? _start : _end,
+      weeks: _weeks,
+      room: _room.text.trim().isEmpty ? null : _room.text.trim(),
+    );
+    final sessions = [
+      for (final existing in t.sessions)
+        if (existing.id == session.id) session else existing,
+      if (!t.sessions.any((existing) => existing.id == session.id)) session,
+    ];
+    return t.copyWith(courses: courses, sessions: sessions);
+  }
+
+  List<ScheduleConflict> get _previewConflicts =>
+      detectScheduleConflicts(_previewTimetable)
+          .where((conflict) => conflict.involvesSession(_sessionId))
+          .toList();
+
   Future<void> _save() async {
     final name = _name.text.trim();
     if (name.isEmpty) {
@@ -145,7 +183,7 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
       );
       if (course.id.isEmpty) {
         course = Course(
-          id: newId('c'),
+          id: _previewCourseId,
           name: name,
           teacher: teacher,
           colorSeed: name.hashCode,
@@ -154,7 +192,7 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
       }
 
       final session = CourseSession(
-        id: widget.session?.id ?? newId('s'),
+        id: _sessionId,
         courseId: course.id,
         day: _day,
         startSection: start,
@@ -212,6 +250,12 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
     final all = allWeeks(t.totalWeeks);
     final odd = oddWeeks(t.totalWeeks);
     final even = evenWeeks(t.totalWeeks);
+    final previewConflicts = _previewConflicts;
+    final conflictingCourseNames = previewConflicts
+        .expand((conflict) => conflict.sessions)
+        .where((session) => session.session.id != _sessionId)
+        .map((session) => session.course.name)
+        .toSet();
 
     return AlertDialog(
       title: Text(isEditing ? '编辑课程' : '添加课程'),
@@ -361,6 +405,29 @@ class _SessionEditorDialogState extends State<_SessionEditorDialog> {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
+              if (previewConflicts.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '该安排会在 ${previewConflicts.length} 天与 '
+                        '${conflictingCourseNames.join('、')} 时间重叠',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               if (isEditing &&
                   widget.session!.activeInWeek(widget.currentWeek)) ...[
                 const SizedBox(height: 16),

@@ -29,7 +29,7 @@ void main() {
     );
 
     expect(find.text('应用更新'), findsOneWidget);
-    expect(find.text('当前版本 v1.2.8'), findsOneWidget);
+    expect(find.text('当前版本 v1.2.9'), findsOneWidget);
     expect(find.text('检查更新'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

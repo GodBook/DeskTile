@@ -7,11 +7,13 @@ import 'package:flutter/services.dart';
 import '../../core/agenda.dart';
 import '../../core/academic_calendar.dart';
 import '../../core/models/timetable.dart';
+import '../../core/schedule_conflict.dart';
 import '../../core/week_math.dart';
 import '../../data/app_state.dart';
 import '../theme.dart';
 import 'academic_calendar_page.dart';
 import 'schedule_change_editor.dart';
+import 'schedule_conflicts_dialog.dart';
 import 'session_editor.dart';
 import 'timetable_manager.dart';
 
@@ -37,6 +39,18 @@ class _TimetablePageState extends State<TimetablePage> {
   int weekOf(Timetable t) =>
       _week ?? clampedWeek(t.termStart, DateTime.now(), t.totalWeeks);
 
+  Future<void> _showConflicts(
+    Timetable timetable,
+    List<ScheduleConflict> conflicts,
+  ) async {
+    final targetWeek = await showScheduleConflictsDialog(
+      context,
+      conflicts: conflicts,
+    );
+    if (!mounted || targetWeek == null) return;
+    setState(() => _week = targetWeek.clamp(1, timetable.totalWeeks));
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
@@ -49,6 +63,10 @@ class _TimetablePageState extends State<TimetablePage> {
       _week = null;
     }
     final week = weekOf(t).clamp(1, t.totalWeeks);
+    final conflicts = detectScheduleConflicts(t);
+    final currentWeekConflicts = conflicts
+        .where((conflict) => conflict.week == week)
+        .length;
 
     return Column(
       children: [
@@ -59,10 +77,74 @@ class _TimetablePageState extends State<TimetablePage> {
           onToday: () => setState(() => _week = null),
         ),
         const Divider(height: 1),
+        if (conflicts.isNotEmpty) ...[
+          _ConflictBanner(
+            conflictCount: conflicts.length,
+            currentWeekCount: currentWeekConflicts,
+            onTap: () => _showConflicts(t, conflicts),
+          ),
+          const Divider(height: 1),
+        ],
         Expanded(
           child: _Grid(timetable: t, week: week),
         ),
       ],
+    );
+  }
+}
+
+class _ConflictBanner extends StatelessWidget {
+  const _ConflictBanner({
+    required this.conflictCount,
+    required this.currentWeekCount,
+    required this.onTap,
+  });
+
+  final int conflictCount;
+  final int currentWeekCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final message = currentWeekCount > 0
+        ? '本周有 $currentWeekCount 处课程时间冲突'
+              '${conflictCount == currentWeekCount ? '' : ' · 学期共 $conflictCount 处'}'
+        : '本学期有 $conflictCount 处课程时间冲突';
+    return Material(
+      color: theme.colorScheme.errorContainer.withValues(alpha: 0.7),
+      child: InkWell(
+        key: const ValueKey('schedule-conflict-banner'),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                size: 19,
+                color: theme.colorScheme.error,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onErrorContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.onErrorContainer,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -661,6 +743,10 @@ class _DayColumn extends StatelessWidget {
       includeChangedSources: true,
     );
     final date = dateOfWeekDay(timetable.termStart, week, day);
+    final conflictingSessionIds = scheduleConflictsOnDate(timetable, date)
+        .expand((conflict) => conflict.sessions)
+        .map((session) => session.session.id)
+        .toSet();
 
     return SizedBox(
       width: width,
@@ -713,7 +799,13 @@ class _DayColumn extends StatelessWidget {
               height: rs.session.sectionCount * _rowHeight - 3,
               left: 2,
               right: 2,
-              child: _CourseBlock(session: rs, week: week),
+              child: _CourseBlock(
+                session: rs,
+                week: week,
+                isConflicting:
+                    !rs.isInactive &&
+                    conflictingSessionIds.contains(rs.session.id),
+              ),
             ),
         ],
       ),
@@ -722,10 +814,15 @@ class _DayColumn extends StatelessWidget {
 }
 
 class _CourseBlock extends StatelessWidget {
-  const _CourseBlock({required this.session, required this.week});
+  const _CourseBlock({
+    required this.session,
+    required this.week,
+    required this.isConflicting,
+  });
 
   final ResolvedSession session;
   final int week;
+  final bool isConflicting;
 
   @override
   Widget build(BuildContext context) {
@@ -782,7 +879,9 @@ class _CourseBlock extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border(left: BorderSide(color: color, width: 3)),
+            border: isConflicting
+                ? Border.all(color: theme.colorScheme.error, width: 1.2)
+                : Border(left: BorderSide(color: color, width: 3)),
           ),
           // 一节课的格子只有 58 逻辑像素高，塞不下课名+教室+教师。
           // 按可用高度决定显示到哪一层，而不是硬塞导致溢出。
@@ -819,6 +918,17 @@ class _CourseBlock extends StatelessWidget {
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: inactive ? theme.colorScheme.outline : color,
                             fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                      if (isConflicting) ...[
+                        const SizedBox(width: 3),
+                        Tooltip(
+                          message: '与其他课程时间冲突',
+                          child: Icon(
+                            Icons.warning_amber_rounded,
+                            size: 14,
+                            color: theme.colorScheme.error,
                           ),
                         ),
                       ],
