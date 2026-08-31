@@ -1,6 +1,6 @@
 # DeskTile 课表岛 — 项目交接文档
 
-> 最后更新：2026-08-30 · 当前状态：Phase 1（Windows）完成 + Phase 2（Android）完成
+> 最后更新：2026-08-31 · 当前状态：Phase 1（Windows）完成 + Phase 2（Android）完成
 > 代码位置：`D:\CLAUDE\DeskTile`（原中文目录 `D:\CLAUDE\DeskTile课表岛` 未使用，见 §1.2）
 > 仓库：https://github.com/GodBook/DeskTile （公开）· 当前发布与源码版本：`v1.2.8`
 > 规模：`lib/` 59 个文件，`test/` 21 个文件 / 210 个 Flutter 用例 + 3 个 Android 原生用例
@@ -754,8 +754,8 @@ CSES 无法表达单次变更，导出会明确警告并建议改用 JSON，而�
 | Android Release 签名 | `flutter build apk --release` + `aapt` / `apksigner` | APK 60,127,070 字节（Flutter 显示约 57.3 MB），`1.2.8+13`、target API 36、APK v2 通过；SHA-256 `82C9F3830A3E43C5191E5DCD589270ADEC0D588F86DDC83DE2DD4B7DBC88A616` |
 | Android AAB | `flutter build appbundle --release` + `jarsigner -verify` | AAB 58,172,823 字节，签名通过；SHA-256 `E2F27446B1FBED774701ADF1207A17A428074445F421D631F00B671CF308BD6F` |
 | Android 升级签名连续性 | `apksigner verify --print-certs` 对比旧版与本地 `v1.2.8` APK | 证书 SHA-256 仍为 `6cf11122888df80a18ad75851ed12b280275addfad9a06820403a630c78f7b0c`，允许覆盖安装 |
-| GitHub Release 远端资产 | 下载 `v1.2.7` Release 后与两份 SHA256 校验文件逐项比对 | APK 60,127,014 字节 / `FE2A59CB6CC45EEBE8E60E5DE0317C37AE34267B5D7B6082A3D5AA5440F4CEC7`；AAB 58,122,210 字节 / `D402F8DCBCBC2B07A305A9CB433E0276F467262779A322521240DEFC65E33480`；Windows Setup 11,364,313 字节 / `18059565A02A0A8328B8E81A09A90355EDC01990B3F6E018C953DB44331B11FB`；APK `1.2.7+12` / target API 36 / v2 签名、AAB JAR 签名均验证通过 |
-| GitHub Actions | 标签 `v1.2.7` 触发 `.github/workflows/android-release.yml` / `windows-release.yml` | Android Run `33314843107`、Windows Run `33314843099` 均 `completed / success`；Release 为公开正式版（非 draft、非 prerelease） |
+| GitHub Release 远端资产 | 下载 `v1.2.8` Release 后与两份 SHA256 校验文件逐项比对 | APK 60,127,014 字节 / `BAE150B4B8D9647E8019BBB508960C02F1776209DAD59DA1F00AA79A900ECC80`；AAB 58,153,081 字节 / `70EF8BF64DC2F27AD9B48A699A8AD02D227542CCEEC7E611CF86A1E5DCA635AF`；Windows Setup 11,368,539 字节 / `A0D8ED185CF878B8EB1EB226639BCC73744AD95B04FB4D71E0C1B96579C950D2`；APK `1.2.8+13` / target API 36 / v2 签名、证书 SHA-256 `6cf11122888df80a18ad75851ed12b280275addfad9a06820403a630c78f7b0c`，AAB JAR 签名均验证通过 |
+| GitHub Actions | 标签 `v1.2.8` 触发 `.github/workflows/android-release.yml` / `windows-release.yml` | Android Run `33317911247`、Windows Run `33317911344` 均 `completed / success`；Release 为公开正式版（非 draft、非 prerelease） |
 | 正式应用图标 | SVG 母版 + Android adaptive/monochrome/legacy + Windows ICO | 已替换 Flutter 默认图标；通知使用独立单色小图标 |
 | Android 手机布局 | Pixel 6 API 36 竖屏 + widget tests | 底部导航、安全区、课表双指缩放/平移、窄屏编辑器均无溢出；见 `docs/screenshots/Android-主界面.png` |
 | Glance 小组件 | Pixel Launcher 添加组件并修改课程 | Provider/实例正常；`RefreshTest / A101` 保存后约 300ms 即时更新，见 `Android-小组件*.png` |
